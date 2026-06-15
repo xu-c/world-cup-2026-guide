@@ -1,0 +1,48 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node",
+      "config": {
+        "maxDuration": 60
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/matches",
+      "dest": "/api/matches.js"
+    },
+    {
+      "src": "/api/matches/([^/]+)",
+      "dest": "/api/matches/[id].js?id=$1"
+    },
+    {
+      "src": "/api/admin/refresh",
+      "dest": "/api/admin/refresh.js"
+    },
+    {
+      "src": "/api/cron/refresh",
+      "dest": "/api/cron/refresh.js"
+    },
+    {
+      "src": "/",
+      "dest": "/public/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/refresh",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}

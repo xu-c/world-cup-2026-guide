@@ -1,0 +1,40 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const appSource = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
+const indexSource = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+
+test("date wheel scrolling is batched into animation frames", () => {
+  assert.match(appSource, /requestAnimationFrame/);
+  assert.match(appSource, /pendingWheelDelta/);
+});
+
+test("finished matches do not render prediction badges", () => {
+  assert.match(
+    appSource,
+    /match\.status !== "finished"[\s\S]*match\.predictionHeadline[\s\S]*已有预测/,
+  );
+});
+
+test("page declares favicon and browser metadata", () => {
+  assert.match(indexSource, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml" \/>/);
+  assert.match(indexSource, /<meta name="theme-color" content="#0d704c" \/>/);
+  assert.match(indexSource, /name="description"/);
+});
+
+test("page includes footer copyright and source attribution", () => {
+  assert.match(indexSource, /<footer class="site-footer">/);
+  assert.match(indexSource, /© 2026 World Cup 2026 Guide/);
+  assert.match(indexSource, /非官方观赛指南/);
+  assert.match(indexSource, /FIFA 官方公开赛程接口/);
+});
+
+test("favicon is an SVG icon asset", () => {
+  const faviconSource = readFileSync(new URL("../public/favicon.svg", import.meta.url), "utf8");
+  assert.match(faviconSource, /<svg/);
+  assert.match(faviconSource, /viewBox="0 0 64 64"/);
+  assert.match(faviconSource, /<title>足球图标<\/title>/);
+  assert.match(faviconSource, /class="soccer-panel"/);
+  assert.match(faviconSource, /class="soccer-seam"/);
+});

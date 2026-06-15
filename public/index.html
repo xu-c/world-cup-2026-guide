@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="2026 世界杯观赛指南，提供中文赛程查询、赛后总结和赛前预测。"
+    />
+    <meta name="theme-color" content="#0d704c" />
+    <title>2026 世界杯观赛指南</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <nav>
+        <strong>World Cup 2026 Guide</strong>
+      </nav>
+      <section>
+        <h1>2026 世界杯观赛指南</h1>
+      </section>
+    </header>
+
+    <main>
+      <section class="toolbar" aria-label="筛选比赛">
+        <button class="filter active" data-filter="all" type="button">全部</button>
+        <button class="filter" data-filter="finished" type="button">已完赛</button>
+        <button class="filter" data-filter="scheduled" type="button">未开赛</button>
+      </section>
+
+      <section id="dateNav" class="date-nav" aria-label="按日期选择比赛"></section>
+
+      <section class="app-shell">
+        <section id="matches" class="matches" aria-live="polite"></section>
+        <aside id="detail" class="detail" aria-live="polite"></aside>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>© 2026 World Cup 2026 Guide. 保留所有权利。</p>
+      <p>本站为非官方观赛指南，数据来源于 FIFA 官方公开赛程接口。</p>
+    </footer>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
