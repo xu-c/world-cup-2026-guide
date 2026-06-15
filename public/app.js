@@ -1,4 +1,3 @@
-let currentFilter = "all";
 let currentDateKey = null;
 let matches = [];
 let selectedMatchId = null;
@@ -8,16 +7,6 @@ let wheelAnimationFrame = null;
 const matchesEl = document.querySelector("#matches");
 const detailEl = document.querySelector("#detail");
 const dateNavEl = document.querySelector("#dateNav");
-
-document.querySelectorAll(".filter").forEach((button) => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll(".filter").forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    currentFilter = button.dataset.filter;
-    selectedMatchId = firstVisibleMatch()?.id ?? null;
-    renderMatches();
-  });
-});
 
 dateNavEl.addEventListener(
   "wheel",
@@ -246,11 +235,7 @@ function buildDateGroups() {
 }
 
 function visibleMatches() {
-  return matches.filter(
-    (match) =>
-      dateKey(new Date(match.kickoffAt)) === currentDateKey &&
-      (currentFilter === "all" || match.status === currentFilter),
-  );
+  return matches.filter((match) => dateKey(new Date(match.kickoffAt)) === currentDateKey);
 }
 
 function firstVisibleMatch() {

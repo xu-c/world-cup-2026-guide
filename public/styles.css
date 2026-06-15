@@ -39,13 +39,6 @@ nav {
   gap: 16px;
 }
 
-.filter.active {
-  background: #f7c948;
-  color: #18221f;
-  font-weight: 700;
-  padding: 10px 14px;
-}
-
 .hero section {
   max-width: 760px;
   padding-top: 84px;
@@ -77,19 +70,6 @@ main {
 
 .site-footer p {
   margin: 0;
-}
-
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.filter {
-  background: #e8ece4;
-  color: #1f2d29;
-  padding: 10px 14px;
 }
 
 .date-nav {

@@ -18,11 +18,17 @@ test("finished matches do not render prediction badges", () => {
 });
 
 test("unfinished match wording replaces unstarted wording", () => {
-  assert.match(indexSource, />未完赛<\/button>/);
   assert.match(appSource, /return "未完赛"/);
   assert.match(appSource, /return "进行中"/);
   assert.doesNotMatch(indexSource, /未开赛/);
   assert.doesNotMatch(appSource, /未开赛/);
+});
+
+test("date navigation is the only match list control", () => {
+  assert.doesNotMatch(indexSource, /class="toolbar"/);
+  assert.doesNotMatch(indexSource, /class="filter/);
+  assert.doesNotMatch(appSource, /currentFilter/);
+  assert.doesNotMatch(appSource, /querySelectorAll\("\.filter"\)/);
 });
 
 test("page declares favicon and browser metadata", () => {
