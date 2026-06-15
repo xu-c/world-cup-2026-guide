@@ -84,3 +84,29 @@ test("keeps FIFA calendar placeholder knockout matches in the schedule", () => {
   assert.equal(matches[0].status, "scheduled");
   assert.equal(matches[0].hasFinalScore, false);
 });
+
+test("normalizes FIFA numeric live match status", () => {
+  const matches = normalizeFifaPayload({
+    Results: [
+      {
+        IdMatch: "400021500",
+        Date: "2026-06-15T19:00:00Z",
+        MatchStatus: 3,
+        Home: {
+          TeamName: [{ Locale: "zh-CN", Description: "法国" }],
+          Score: 1,
+        },
+        Away: {
+          TeamName: [{ Locale: "zh-CN", Description: "日本" }],
+          Score: 0,
+        },
+        HomeTeamScore: 1,
+        AwayTeamScore: 0,
+      },
+    ],
+  });
+
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].status, "live");
+  assert.equal(matches[0].hasFinalScore, false);
+});

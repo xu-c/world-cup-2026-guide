@@ -67,7 +67,7 @@ function normalizeMatch(item, index) {
     homeScore,
     awayScore,
     status,
-    hasFinalScore: homeScore !== null && awayScore !== null,
+    hasFinalScore: status === "finished" && homeScore !== null && awayScore !== null,
     groupName: text(item.groupName || localized(item.GroupName) || item.Group),
     stage: text(item.stage || localized(item.StageName) || item.Stage),
     venue: text(item.venue || localized(item.Stadium?.Name) || item.Venue),
@@ -162,6 +162,7 @@ function seedMatches() {
 function normalizeStatus(value, homeScore, awayScore) {
   if (value === 0 && homeScore !== null && awayScore !== null) return "finished";
   if (value === 1) return "scheduled";
+  if (value === 3) return "live";
 
   const normalized = String(value || "").toLowerCase().replaceAll(" ", "_");
   if (["finished", "final", "full_time", "completed"].includes(normalized)) return "finished";

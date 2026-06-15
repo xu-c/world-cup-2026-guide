@@ -255,7 +255,7 @@ function rowToMatch(row) {
     kickoffAt: row.kickoff_at,
     updatedAt: row.updated_at,
     sourceHash: row.source_hash,
-    hasFinalScore: row.home_score !== null && row.away_score !== null,
+    hasFinalScore: row.status === "finished" && row.home_score !== null && row.away_score !== null,
     summaryHeadline: row.summary_headline,
     summaryModel: row.summary_model,
     predictionHeadline: row.prediction_headline,

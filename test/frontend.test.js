@@ -17,6 +17,14 @@ test("finished matches do not render prediction badges", () => {
   );
 });
 
+test("unfinished match wording replaces unstarted wording", () => {
+  assert.match(indexSource, />未完赛<\/button>/);
+  assert.match(appSource, /return "未完赛"/);
+  assert.match(appSource, /return "进行中"/);
+  assert.doesNotMatch(indexSource, /未开赛/);
+  assert.doesNotMatch(appSource, /未开赛/);
+});
+
 test("page declares favicon and browser metadata", () => {
   assert.match(indexSource, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml" \/>/);
   assert.match(indexSource, /<meta name="theme-color" content="#0d704c" \/>/);

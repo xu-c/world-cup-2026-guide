@@ -199,14 +199,14 @@ function probabilityRow(label, value) {
 }
 
 function scoreText(match) {
-  if (match.homeScore === null || match.awayScore === null) return "未开赛";
+  if (match.homeScore === null || match.awayScore === null) return "未完赛";
   return `${match.homeScore} - ${match.awayScore}`;
 }
 
 function statusText(status) {
   if (status === "finished") return "已完赛";
   if (status === "live") return "进行中";
-  return "未开赛";
+  return "未完赛";
 }
 
 function formatDateTime(value) {
