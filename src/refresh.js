@@ -68,11 +68,13 @@ export async function refreshWorldCupData(db, { now = new Date(), fetchImpl = fe
           : null;
       const finalCompletion =
         type === "summary" &&
+        !summaryContext.detailFetchFailed &&
         shouldRunFinalSummaryCompletion({ match, summary: existingInsight, now });
       const shouldGenerate =
         type === "summary"
-          ? finalCompletion ||
-            summaryNeedsRegeneration(existingInsight, summaryContext.factsHash, match, now) ||
+          ? (!summaryContext.detailFetchFailed &&
+              (finalCompletion ||
+                summaryNeedsRegeneration(existingInsight, summaryContext.factsHash, match, now))) ||
             shouldGenerateInsight({
               match,
               insightType: type,
@@ -138,7 +140,8 @@ function shouldUpgradeFallbackInsight(insight) {
 }
 
 async function buildSummaryContext({ db, row, sourceMatch, fetchImpl }) {
-  const detail = await fetchFifaMatchDetail(sourceMatch.fifaId, fetchImpl).catch(() => null);
+  const detailResult = await fetchMatchDetailResult(sourceMatch.fifaId, fetchImpl);
+  const detail = detailResult.ok ? detailResult.detail : null;
   const officialFacts = extractOfficialFacts(sourceMatch, detail);
   const completeness = factsCompleteness(officialFacts);
 
@@ -147,7 +150,22 @@ async function buildSummaryContext({ db, row, sourceMatch, fetchImpl }) {
     officialFacts,
     completeness,
     factsHash: officialFactsHash(officialFacts),
+    detailFetchFailed: !detailResult.ok,
   };
+}
+
+async function fetchMatchDetailResult(fifaId, fetchImpl) {
+  try {
+    return {
+      ok: true,
+      detail: await fetchFifaMatchDetail(fifaId, fetchImpl),
+    };
+  } catch {
+    return {
+      ok: false,
+      detail: null,
+    };
+  }
 }
 
 function summaryNeedsRegeneration(existingSummary, factsHash, match, now) {

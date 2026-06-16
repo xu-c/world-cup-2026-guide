@@ -89,6 +89,32 @@ test("refreshes due partial finished summaries without UI controls", () => {
   );
 });
 
+test("does not refresh old partial finished summaries before the twelve hour interval", () => {
+  assert.deepEqual(
+    shouldStartBackgroundRefresh({
+      matches: [
+        {
+          status: "finished",
+          hasFinalScore: true,
+          homeScore: 2,
+          awayScore: 1,
+          kickoffAt: "2026-06-12T20:00:00.000Z",
+          summaryHeadline: "部分赛后总结",
+          summaryOfficialFactsStatus: "partial",
+          summaryGeneratedAt: "2026-06-14T00:00:00.000Z",
+        },
+      ],
+      latestRefresh: {
+        status: "success",
+        finished_at: "2026-06-14T11:44:00.000Z",
+        started_at: "2026-06-14T11:44:00.000Z",
+      },
+      now,
+    }),
+    { shouldRefresh: false, reason: "nothing_due" },
+  );
+});
+
 test("refreshes cached local fallback summaries when an AI provider is configured", () => {
   const previous = process.env.AI_API_KEY;
   process.env.AI_API_KEY = "test-key";

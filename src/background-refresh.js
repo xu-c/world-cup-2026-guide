@@ -1,4 +1,4 @@
-import { getMatchRefreshPolicy, isFinishedMatch } from "./policies.js";
+import { getMatchRefreshPolicy, isFinishedMatch, shouldRefreshPartialSummary } from "./policies.js";
 import { refreshWorldCupData } from "./refresh.js";
 import { hasConfiguredAiProvider } from "./ai.js";
 
@@ -22,12 +22,17 @@ export function shouldStartBackgroundRefresh({ matches, latestRefresh, now = new
         return { shouldRefresh: true, reason: "summary_local_fallback" };
       }
       if (match.summaryOfficialFactsStatus === "partial") {
-        const policy = getMatchRefreshPolicy(match, now);
         const latestFinishedAt = refreshFinishedAt(latestRefresh);
-        if (
-          !latestFinishedAt ||
-          ageInMinutes(latestFinishedAt, now) >= (policy.dataTtlMinutes ?? 15)
-        ) {
+        if (shouldRefreshPartialSummary({
+          match: withFinalScoreFlag(match),
+          summary: {
+            officialFactsStatus: match.summaryOfficialFactsStatus,
+            generatedAt: match.summaryGeneratedAt,
+            finalizedAt: match.summaryFinalizedAt,
+          },
+          latestAttemptAt: latestFinishedAt,
+          now,
+        })) {
           return { shouldRefresh: true, reason: "summary_partial" };
         }
       }

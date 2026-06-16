@@ -178,6 +178,53 @@ test("partial summaries do not regenerate when official facts are unchanged", as
   }
 });
 
+test("partial summaries do not regenerate when FIFA detail fetch fails", async () => {
+  const context = createDb();
+  const detail = partialDetail({ changed: true });
+  const factsHash = officialFactsHash(extractOfficialFacts(normalizedFinishedMatch("partial-detail-fails"), detail));
+  const existing = upsertMatch(context.db, normalizedFinishedMatch("partial-detail-fails"));
+  upsertInsight(context.db, existing.id, "summary", summaryPayload({
+    generatedAt: "2026-06-14T22:00:00.000Z",
+    officialFactsStatus: "partial",
+    officialFactsHash: factsHash,
+  }));
+
+  const previous = withEnv({
+    FIFA_MATCHES_URL: "https://fifa.example/matches",
+    FIFA_MATCH_DETAIL_BASE_URL: "https://fifa.example/detail",
+    AI_API_KEY: "test-key",
+    AI_BASE_URL: "https://provider.example/v1",
+    AI_MODEL: "mimo-v2.5-pro",
+  });
+  let aiCalled = false;
+
+  try {
+    await refreshWorldCupData(context.store, {
+      now: new Date("2026-06-14T22:15:00.000Z"),
+      fetchImpl: async (url) => {
+        const href = String(url);
+        if (href.includes("provider.example")) aiCalled = true;
+        if (href.includes("/detail/partial-detail-fails")) {
+          return {
+            ok: false,
+            status: 503,
+            text: async () => "temporarily unavailable",
+          };
+        }
+        return jsonResponse({ Results: [finishedMatch({ fifaId: "partial-detail-fails" })] });
+      },
+    });
+
+    const summary = getInsight(context.db, existing.id, "summary");
+    assert.equal(aiCalled, false);
+    assert.equal(summary.generatedAt, "2026-06-14T22:00:00.000Z");
+    assert.equal(summary.officialFactsHash, factsHash);
+  } finally {
+    previous.restore();
+    context.close();
+  }
+});
+
 test("partial summaries regenerate when official facts changed and policy allows it", async () => {
   const context = createDb();
   const oldHash = "old-facts-hash";
