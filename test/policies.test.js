@@ -72,6 +72,16 @@ test("same-day unfinished matches refresh frequently and keep predictions fresh"
     }),
     true,
   );
+
+  assert.equal(
+    shouldGenerateInsight({
+      match,
+      insightType: "prediction",
+      existingInsight: { generatedAt: "2026-06-14T08:30:00.000Z" },
+      now: new Date("2026-06-14T20:00:00.000Z"),
+    }),
+    false,
+  );
 });
 
 test("future matches refresh at low frequency and reuse fresh predictions", () => {
