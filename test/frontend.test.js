@@ -81,3 +81,23 @@ test("frontend renders post-match prediction review as secondary content", () =>
   assert.match(appSource, /赛前预测回看/);
   assert.match(appSource, /赛前预测/);
 });
+
+test("frontend guards structured prediction before v2 rendering", () => {
+  assert.match(appSource, /canRenderStructuredPrediction/);
+  assert.match(
+    appSource,
+    /insight\.structured\?\.schemaVersion === "prediction-v2"[\s\S]*canRenderStructuredPrediction\(insight\.structured\)/,
+  );
+});
+
+test("frontend guards structured summary before v2 rendering", () => {
+  assert.match(appSource, /canRenderStructuredSummary/);
+  assert.match(
+    appSource,
+    /insight\.structured\?\.schemaVersion === "summary-v2"[\s\S]*canRenderStructuredSummary\(insight\.structured\)/,
+  );
+});
+
+test("frontend escapes official attendance values", () => {
+  assert.match(appSource, /escapeHtml\(String\(facts\.attendance \?\? "暂缺"\)\)/);
+});

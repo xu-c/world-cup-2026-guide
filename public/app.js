@@ -205,10 +205,16 @@ function renderDateNav() {
 }
 
 function renderInsight(insight) {
-  if (insight.structured?.schemaVersion === "prediction-v2") {
+  if (
+    insight.structured?.schemaVersion === "prediction-v2" &&
+    canRenderStructuredPrediction(insight.structured)
+  ) {
     return renderStructuredPrediction(insight.structured);
   }
-  if (insight.structured?.schemaVersion === "summary-v2") {
+  if (
+    insight.structured?.schemaVersion === "summary-v2" &&
+    canRenderStructuredSummary(insight.structured)
+  ) {
     return renderStructuredSummary(insight.structured);
   }
   return renderLegacyInsight(insight);
@@ -364,7 +370,7 @@ function renderTechnicalFacts(summary) {
       <dt>场馆</dt>
       <dd>${escapeHtml(facts.venue || "暂缺")} ${renderCompletionNote(summary, "venue")}</dd>
       <dt>上座人数</dt>
-      <dd>${facts.attendance ?? "暂缺"} ${renderCompletionNote(summary, "attendance")}</dd>
+      <dd>${escapeHtml(String(facts.attendance ?? "暂缺"))} ${renderCompletionNote(summary, "attendance")}</dd>
       <dt>裁判</dt>
       <dd>${escapeHtml((facts.officials || []).join("、") || "暂缺")} ${renderCompletionNote(summary, "officials")}</dd>
     </dl>
@@ -406,6 +412,77 @@ function probabilityRow(label, value) {
       <div class="bar"><span style="width: ${percent}%"></span></div>
     </div>
   `;
+}
+
+function canRenderStructuredPrediction(prediction) {
+  return (
+    isObject(prediction) &&
+    hasRenderableText(prediction.headline) &&
+    hasRenderableText(prediction.shortText) &&
+    isObject(prediction.predictedScore) &&
+    hasRenderableText(prediction.predictedScore.label) &&
+    hasRenderableProbabilities(prediction.outcomeProbabilities) &&
+    isObject(prediction.matchScript) &&
+    hasRenderableText(prediction.matchScript.summary) &&
+    hasRenderableText(prediction.matchScript.firstHalf) &&
+    hasRenderableText(prediction.matchScript.secondHalf) &&
+    hasRenderableList(prediction.scoreRationale) &&
+    hasRenderableList(prediction.decisiveFactors) &&
+    hasRenderableList(prediction.riskFactors)
+  );
+}
+
+function canRenderStructuredSummary(summary) {
+  return (
+    isObject(summary) &&
+    hasRenderableText(summary.headline) &&
+    isObject(summary.matchStory) &&
+    hasRenderableText(summary.matchStory.summary) &&
+    hasRenderableText(summary.matchStory.turningPoint) &&
+    hasRenderableText(summary.matchStory.closingPhase) &&
+    isObject(summary.officialEvents) &&
+    Array.isArray(summary.officialEvents.goals) &&
+    Array.isArray(summary.officialEvents.cards) &&
+    Array.isArray(summary.officialEvents.substitutions) &&
+    isObject(summary.technicalFacts) &&
+    isObject(summary.aiAnalysis) &&
+    Array.isArray(summary.aiAnalysis.tacticalSummary) &&
+    Array.isArray(summary.aiAnalysis.keyPlayerImpact) &&
+    Array.isArray(summary.aiAnalysis.resultExplanation) &&
+    canRenderPredictionReview(summary.predictionReview)
+  );
+}
+
+function canRenderPredictionReview(review) {
+  if (!review) return true;
+  return (
+    isObject(review) &&
+    hasRenderableText(review.predictedScore) &&
+    hasRenderableText(review.actualScore) &&
+    hasRenderableProbabilities(review.preMatchProbabilities) &&
+    hasRenderableText(review.reviewText)
+  );
+}
+
+function hasRenderableProbabilities(probabilities) {
+  return (
+    isObject(probabilities) &&
+    Number.isFinite(Number(probabilities.homeWin)) &&
+    Number.isFinite(Number(probabilities.draw)) &&
+    Number.isFinite(Number(probabilities.awayWin))
+  );
+}
+
+function hasRenderableList(value) {
+  return Array.isArray(value) && value.length > 0;
+}
+
+function hasRenderableText(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function scoreText(match) {
