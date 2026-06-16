@@ -91,3 +91,61 @@ test("SQLite insights round-trip structured v2 metadata", () => {
     rmSync(`${dbPath}-wal`, { force: true });
   }
 });
+
+test("SQLite insights ignore malformed optional structured metadata", () => {
+  const dbPath = join(tmpdir(), `worldcup-db-v2-malformed-${process.pid}-${Date.now()}.db`);
+  const db = openDatabase(dbPath);
+
+  try {
+    const match = upsertMatch(db, {
+      fifaId: "malformed-structured",
+      homeTeam: "西班牙",
+      awayTeam: "日本",
+      homeScore: null,
+      awayScore: null,
+      status: "scheduled",
+      groupName: "E组",
+      stage: "小组赛",
+      venue: "示例体育场",
+      city: "示例城市",
+      kickoffAt: "2026-06-21T20:00:00.000Z",
+      updatedAt: "2026-06-16T10:00:00.000Z",
+      sourceHash: "match-hash",
+      raw: { id: "malformed-structured" },
+    });
+
+    upsertInsight(db, match.id, "prediction", {
+      insight: {
+        headline: "西班牙控球优势明显",
+        shortText: "西班牙预计会控制球权，日本需要提升转换效率。",
+        keyMoments: ["西班牙控制中场", "日本等待反击"],
+        tacticalNotes: ["西班牙控球更稳定"],
+        playersToWatch: ["西班牙中场"],
+        probabilities: { homeWin: 0.55, draw: 0.25, awayWin: 0.2 },
+        confidence: "medium",
+        generatedFor: "prediction",
+      },
+      model: "test-model",
+      promptVersion: "legacy",
+      sourceHash: "source-hash",
+      generatedAt: "2026-06-16T10:05:00.000Z",
+    });
+
+    db.prepare(`
+      UPDATE insights
+      SET structured_json = ?, completion_notes_json = ?
+      WHERE match_id = ? AND type = 'prediction'
+    `).run("{not-json", "[also-not-json", match.id);
+
+    const insight = getInsight(db, match.id, "prediction");
+    assert.equal(insight.headline, "西班牙控球优势明显");
+    assert.deepEqual(insight.probabilities, { homeWin: 0.55, draw: 0.25, awayWin: 0.2 });
+    assert.equal(insight.structured, null);
+    assert.equal(insight.completionNotes, null);
+  } finally {
+    db.close();
+    rmSync(dbPath, { force: true });
+    rmSync(`${dbPath}-shm`, { force: true });
+    rmSync(`${dbPath}-wal`, { force: true });
+  }
+});

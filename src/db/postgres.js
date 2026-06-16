@@ -319,5 +319,10 @@ function optionalJson(value) {
 }
 
 function parseOptionalJson(value) {
-  return value === null || value === undefined ? null : JSON.parse(value);
+  if (value === null || value === undefined) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }
