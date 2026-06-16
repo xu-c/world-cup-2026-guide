@@ -79,6 +79,29 @@ test("prediction-v2 rejects unsupported confidence values", () => {
   );
 });
 
+test("prediction-v2 rejects probability totals that do not sum to one", () => {
+  assert.throws(
+    () =>
+      validatePredictionV2({
+        schemaVersion: "prediction-v2",
+        type: "prediction",
+        headline: "概率总和错误",
+        shortText: "这是一条结构完整但概率总和错误的预测。",
+        predictedScore: { home: 1, away: 1, label: "1-1" },
+        outcomeProbabilities: { homeWin: 1, draw: 1, awayWin: 1 },
+        matchScript: { summary: "a", firstHalf: "b", secondHalf: "c" },
+        scoreRationale: ["a"],
+        tacticalFactors: ["a"],
+        decisiveFactors: ["a"],
+        riskFactors: ["a"],
+        playersToWatch: ["a"],
+        confidence: "medium",
+        generatedFor: "prediction",
+      }),
+    /outcomeProbabilities must sum to 1/,
+  );
+});
+
 test("summary-v2 accepts approved official facts and prediction review", () => {
   const summary = validateSummaryV2({
     schemaVersion: "summary-v2",

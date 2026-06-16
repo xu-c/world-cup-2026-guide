@@ -96,11 +96,17 @@ function validateProbabilities(value, name) {
     throw new Error(`${name} must be an object`);
   }
 
-  return {
+  const probabilities = {
     homeWin: requireProbability(value.homeWin, `${name}.homeWin`),
     draw: requireProbability(value.draw, `${name}.draw`),
     awayWin: requireProbability(value.awayWin, `${name}.awayWin`),
   };
+  const total = probabilities.homeWin + probabilities.draw + probabilities.awayWin;
+  if (Math.abs(total - 1) > 0.02) {
+    throw new Error(`${name} must sum to 1`);
+  }
+
+  return probabilities;
 }
 
 function validateMatchScript(value) {
