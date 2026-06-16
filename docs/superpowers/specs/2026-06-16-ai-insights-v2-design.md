@@ -225,6 +225,22 @@ Complete summaries:
 
 The UI label disappears automatically once `officialFactsStatus` becomes `complete`.
 
+If a summary remains partial for more than two days after the official match finish time, the system performs one final completion pass:
+
+- Fetch official detail data one last time.
+- Ask AI to review only the still-uncertain approved fields.
+- If AI can infer or normalize a missing approved field from already available official data, store that value with a low-key provenance marker.
+- If a field still cannot be completed, store it as an explicit blank/missing value with a low-key marker.
+- After this final pass, set `officialFactsStatus` to `complete` and stop future completion refreshes for that summary.
+
+The final completion pass must not create unsupported technical stats. It may only resolve approved fields that are already part of the summary structure.
+
+UI markers after the final pass:
+
+- AI-assisted completion: show a low-key label such as `AI 辅助确认`.
+- Final blank value: show a low-key label such as `官方数据缺失`.
+- These labels are field-level markers, not a page-level incomplete-summary warning.
+
 ## Post-Match Prediction Review
 
 Completed match pages should connect the pre-match prediction to the actual result without making it the main content.
@@ -262,6 +278,8 @@ Finished:
 - If official facts changed and the summary is still partial, regenerate the summary.
 - Recent finished matches may check at most once every 15 minutes.
 - Finished matches older than 24 hours may check at most once every 12 hours.
+- If a summary is still partial more than two days after the match finish time, perform one final completion pass using official data plus AI review of the remaining uncertain approved fields.
+- After the final completion pass, mark the summary complete even if some approved fields remain blank with a low-key `官方数据缺失` marker.
 - Complete summaries are locked.
 
 ## Storage Strategy
@@ -274,6 +292,8 @@ Recommended additions:
 - `schema_version`: `prediction-v2` or `summary-v2`.
 - `official_facts_status`: `complete` or `partial` for summaries.
 - `official_facts_hash`: hash of normalized official facts used to generate a summary.
+- `finalized_at`: timestamp for summaries finalized by normal completion or the two-day final pass.
+- `completion_notes_json`: field-level provenance for AI-assisted values and final blank values.
 - `frozen_at`: timestamp for predictions frozen at kickoff or later.
 
 The existing columns remain available for backward compatibility and easy rollback.
@@ -304,6 +324,9 @@ Add or update tests for:
 - Prediction cannot be generated at or after kickoff.
 - Prediction cannot be generated for live or finished matches.
 - Partial summaries can be regenerated only after allowed intervals.
+- Partial summaries older than two days receive one final completion pass.
+- Final blank fields are rendered with low-key field-level markers.
+- AI-assisted completed fields are rendered with low-key field-level markers.
 - Complete summaries are locked.
 - Summary technical facts do not include unapproved stats.
 - Frontend renders partial-summary label only for partial summaries.
