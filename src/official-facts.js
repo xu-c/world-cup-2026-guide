@@ -14,10 +14,10 @@ export function extractOfficialFacts(match, detail = null) {
   const homeName = teamName(home) || match.homeTeam || "主队";
   const awayName = teamName(away) || match.awayTeam || "客队";
   const homeScore = numberOrNull(
-    detail ? raw.HomeScore ?? raw.HomeTeamScore ?? home.Score ?? match.homeScore : match.homeScore ?? home.Score,
+    match.homeScore ?? raw.HomeScore ?? raw.HomeTeamScore ?? home.Score,
   );
   const awayScore = numberOrNull(
-    detail ? raw.AwayScore ?? raw.AwayTeamScore ?? away.Score ?? match.awayScore : match.awayScore ?? away.Score,
+    match.awayScore ?? raw.AwayScore ?? raw.AwayTeamScore ?? away.Score,
   );
   const playerNames = new Map([
     ...playersForTeam(home).map((player) => [String(player.IdPlayer ?? player.id), playerName(player)]),

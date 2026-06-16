@@ -51,7 +51,7 @@ test("extractOfficialFacts supports Home and Away detail shapes", () => {
     {
       homeTeam: "主队",
       awayTeam: "客队",
-      homeScore: 0,
+      homeScore: 1,
       awayScore: 0,
       raw: {},
     },
@@ -92,6 +92,41 @@ test("extractOfficialFacts supports Home and Away detail shapes", () => {
   assert.equal(facts.officialEvents.goals[0].type, "penalty");
   assert.equal(facts.officialEvents.cards[0].card, "red");
   assert.equal(facts.technicalFacts.officials[0], "VAR");
+});
+
+test("extractOfficialFacts prefers stored match score over detail score", () => {
+  const facts = extractOfficialFacts(
+    {
+      homeTeam: "主队",
+      awayTeam: "客队",
+      homeScore: 2,
+      awayScore: 1,
+      raw: {},
+    },
+    {
+      HomeTeam: {
+        TeamName: [{ Locale: "zh-CN", Description: "主队" }],
+        Score: 0,
+        Goals: [],
+        Bookings: [],
+        Substitutions: [],
+      },
+      AwayTeam: {
+        TeamName: [{ Locale: "zh-CN", Description: "客队" }],
+        Score: 0,
+        Goals: [],
+        Bookings: [],
+        Substitutions: [],
+      },
+    },
+  );
+
+  assert.deepEqual(facts.result, {
+    homeScore: 2,
+    awayScore: 1,
+    winner: "主队",
+    resultText: "主队 2-1 客队",
+  });
 });
 
 test("factsCompleteness is partial when approved detail arrays are unavailable", () => {
