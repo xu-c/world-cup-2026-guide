@@ -292,6 +292,68 @@ main {
   height: 10px;
 }
 
+.prediction-hero .predicted-score {
+  display: inline-grid;
+  gap: 0.25rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(13, 112, 76, 0.18);
+  border-radius: 8px;
+  background: rgba(13, 112, 76, 0.06);
+}
+
+.predicted-score span {
+  color: #66726c;
+  font-size: 0.85rem;
+}
+
+.predicted-score strong {
+  font-size: 1.8rem;
+}
+
+.status-chip.muted {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.08);
+  color: #66726c;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.muted-text {
+  color: #66726c;
+  margin: 0;
+}
+
+.subtle-panel {
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.facts-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 0.8rem;
+}
+
+.facts-list dt {
+  color: #66726c;
+}
+
+.facts-list dd {
+  margin: 0;
+}
+
+.prediction-review {
+  grid-column: 1 / -1;
+}
+
+.probabilities.compact .bar span {
+  height: 0.35rem;
+}
+
 @media (max-width: 860px) {
   .app-shell {
     display: block;

@@ -205,6 +205,16 @@ function renderDateNav() {
 }
 
 function renderInsight(insight) {
+  if (insight.structured?.schemaVersion === "prediction-v2") {
+    return renderStructuredPrediction(insight.structured);
+  }
+  if (insight.structured?.schemaVersion === "summary-v2") {
+    return renderStructuredSummary(insight.structured);
+  }
+  return renderLegacyInsight(insight);
+}
+
+function renderLegacyInsight(insight) {
   return `
     <div class="grid">
       <section class="panel">
@@ -230,8 +240,166 @@ function renderInsight(insight) {
   `;
 }
 
+function renderStructuredPrediction(prediction) {
+  return `
+    <div class="grid insight-grid">
+      <section class="panel prediction-hero">
+        <h3>赛前预测</h3>
+        <strong>${escapeHtml(prediction.headline)}</strong>
+        <p>${escapeHtml(prediction.shortText)}</p>
+        <div class="predicted-score">
+          <span>比分预测</span>
+          <strong>${escapeHtml(prediction.predictedScore.label)}</strong>
+        </div>
+      </section>
+      <section class="panel probabilities">
+        <h3>胜平负概率</h3>
+        ${probabilityRow("主胜", prediction.outcomeProbabilities.homeWin)}
+        ${probabilityRow("平局", prediction.outcomeProbabilities.draw)}
+        ${probabilityRow("客胜", prediction.outcomeProbabilities.awayWin)}
+      </section>
+      <section class="panel">
+        <h3>比赛走势</h3>
+        <p>${escapeHtml(prediction.matchScript.summary)}</p>
+        <ul>
+          <li>${escapeHtml(prediction.matchScript.firstHalf)}</li>
+          <li>${escapeHtml(prediction.matchScript.secondHalf)}</li>
+        </ul>
+      </section>
+      <section class="panel">
+        <h3>预测依据</h3>
+        <ul>${prediction.scoreRationale.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </section>
+      <section class="panel">
+        <h3>关键因素</h3>
+        <ul>${prediction.decisiveFactors.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </section>
+      <section class="panel subtle-panel">
+        <h3>风险因素</h3>
+        <ul>${prediction.riskFactors.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </section>
+    </div>
+  `;
+}
+
+function renderStructuredSummary(summary) {
+  const partialBadge =
+    summary.officialFactsStatus === "partial"
+      ? `<span class="status-chip muted" title="部分官方事件数据可能稍后补齐，系统会按刷新间隔自动更新。">官方数据补全中</span>`
+      : "";
+
+  return `
+    <div class="grid insight-grid">
+      <section class="panel summary-hero">
+        <h3>赛后总结 ${partialBadge}</h3>
+        <strong>${escapeHtml(summary.headline)}</strong>
+        <p>${escapeHtml(summary.matchStory.summary)}</p>
+      </section>
+      <section class="panel">
+        <h3>比赛脉络</h3>
+        <ul>
+          <li>${escapeHtml(summary.matchStory.turningPoint)}</li>
+          <li>${escapeHtml(summary.matchStory.closingPhase)}</li>
+        </ul>
+      </section>
+      <section class="panel">
+        <h3>官方事件</h3>
+        <h4>进球</h4>
+        ${renderEventList(
+          summary.officialEvents.goals,
+          (goal) =>
+            `${escapeHtml(goal.minute)} ${escapeHtml(goal.team)} ${escapeHtml(goal.player)}${
+              goal.assist ? ` · 助攻 ${escapeHtml(goal.assist)}` : ""
+            }`,
+        )}
+        <h4>红黄牌</h4>
+        ${renderEventList(
+          summary.officialEvents.cards,
+          (card) =>
+            `${escapeHtml(card.minute)} ${escapeHtml(card.team)} ${escapeHtml(card.player)} ${escapeHtml(card.card)}`,
+        )}
+        <h4>换人</h4>
+        ${renderEventList(
+          summary.officialEvents.substitutions,
+          (substitution) =>
+            `${escapeHtml(substitution.minute)} ${escapeHtml(substitution.team)} ${escapeHtml(
+              substitution.playerOn,
+            )} 换下 ${escapeHtml(substitution.playerOff)}`,
+        )}
+      </section>
+      <section class="panel">
+        <h3>官方技术事实</h3>
+        ${renderTechnicalFacts(summary)}
+      </section>
+      <section class="panel">
+        <h3>AI 赛后分析</h3>
+        ${renderAnalysisList("战术", summary.aiAnalysis.tacticalSummary)}
+        ${renderAnalysisList("球员影响", summary.aiAnalysis.keyPlayerImpact)}
+        ${renderAnalysisList("赛果解释", summary.aiAnalysis.resultExplanation)}
+      </section>
+      ${summary.predictionReview ? renderPredictionReview(summary.predictionReview) : ""}
+    </div>
+  `;
+}
+
+function renderEventList(items, formatter) {
+  if (!items || items.length === 0) return `<p class="muted-text">暂无官方事件记录</p>`;
+  return `<ul>${items.map((item) => `<li>${formatter(item)}</li>`).join("")}</ul>`;
+}
+
+function renderAnalysisList(label, items) {
+  if (!items || items.length === 0) return "";
+  return `
+    <h4>${escapeHtml(label)}</h4>
+    <ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+  `;
+}
+
+function renderTechnicalFacts(summary) {
+  const facts = summary.technicalFacts;
+  return `
+    <dl class="facts-list">
+      <dt>阵型</dt>
+      <dd>${escapeHtml(facts.formations?.home || "暂缺")} - ${escapeHtml(facts.formations?.away || "暂缺")} ${renderCompletionNote(summary, "formations")}</dd>
+      <dt>场馆</dt>
+      <dd>${escapeHtml(facts.venue || "暂缺")} ${renderCompletionNote(summary, "venue")}</dd>
+      <dt>上座人数</dt>
+      <dd>${facts.attendance ?? "暂缺"} ${renderCompletionNote(summary, "attendance")}</dd>
+      <dt>裁判</dt>
+      <dd>${escapeHtml((facts.officials || []).join("、") || "暂缺")} ${renderCompletionNote(summary, "officials")}</dd>
+    </dl>
+  `;
+}
+
+function renderCompletionNote(summary, key) {
+  const note = summary.completionNotes?.[key];
+  if (!note) return "";
+  if (note.source === "official") return "";
+  const label = note.source === "ai" ? "AI 辅助确认" : "官方数据缺失";
+  return `<span class="status-chip muted" title="${escapeHtml(note.label)}">${label}</span>`;
+}
+
+function renderPredictionReview(review) {
+  return `
+    <section class="panel subtle-panel prediction-review">
+      <h3>赛前预测回看</h3>
+      <p>预测比分 ${escapeHtml(review.predictedScore)} · 实际比分 ${escapeHtml(review.actualScore)}</p>
+      <p>${review.scoreHit ? "比分命中" : "比分未命中"} · ${
+        review.outcomeHit ? "赛果方向命中" : "赛果方向未命中"
+      }</p>
+      <div class="probabilities compact">
+        <h4>赛前预测</h4>
+        ${probabilityRow("主胜", review.preMatchProbabilities.homeWin)}
+        ${probabilityRow("平局", review.preMatchProbabilities.draw)}
+        ${probabilityRow("客胜", review.preMatchProbabilities.awayWin)}
+      </div>
+      <p>${escapeHtml(review.reviewText)}</p>
+    </section>
+  `;
+}
+
 function probabilityRow(label, value) {
-  const percent = Math.round(value * 100);
+  const percent = Math.max(0, Math.min(100, Math.round(Number(value) * 100)));
   return `
     <div>
       <div class="meta">${label} ${percent}%</div>

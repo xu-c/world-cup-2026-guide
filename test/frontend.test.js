@@ -60,3 +60,24 @@ test("favicon is an SVG icon asset", () => {
   assert.match(faviconSource, /class="soccer-panel"/);
   assert.match(faviconSource, /class="soccer-seam"/);
 });
+
+test("frontend renders structured prediction score and rationale", () => {
+  assert.match(appSource, /renderStructuredPrediction/);
+  assert.match(appSource, /predictedScore/);
+  assert.match(appSource, /比分预测/);
+  assert.match(appSource, /预测依据/);
+  assert.match(appSource, /风险因素/);
+});
+
+test("frontend renders summary partial and field-level completion markers", () => {
+  assert.match(appSource, /官方数据补全中/);
+  assert.match(appSource, /AI 辅助确认/);
+  assert.match(appSource, /官方数据缺失/);
+  assert.match(appSource, /renderCompletionNote/);
+});
+
+test("frontend renders post-match prediction review as secondary content", () => {
+  assert.match(appSource, /predictionReview/);
+  assert.match(appSource, /赛前预测回看/);
+  assert.match(appSource, /赛前预测/);
+});
