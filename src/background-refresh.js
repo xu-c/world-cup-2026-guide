@@ -21,6 +21,16 @@ export function shouldStartBackgroundRefresh({ matches, latestRefresh, now = new
       if (hasConfiguredAiProvider() && match.summaryModel === "local-fallback") {
         return { shouldRefresh: true, reason: "summary_local_fallback" };
       }
+      if (match.summaryOfficialFactsStatus === "partial") {
+        const policy = getMatchRefreshPolicy(match, now);
+        const latestFinishedAt = refreshFinishedAt(latestRefresh);
+        if (
+          !latestFinishedAt ||
+          ageInMinutes(latestFinishedAt, now) >= (policy.dataTtlMinutes ?? 15)
+        ) {
+          return { shouldRefresh: true, reason: "summary_partial" };
+        }
+      }
       continue;
     }
 

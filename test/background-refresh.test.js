@@ -64,6 +64,31 @@ test("refreshes a finished match once when its summary is missing", () => {
   );
 });
 
+test("refreshes due partial finished summaries without UI controls", () => {
+  assert.deepEqual(
+    shouldStartBackgroundRefresh({
+      matches: [
+        {
+          status: "finished",
+          hasFinalScore: true,
+          homeScore: 2,
+          awayScore: 1,
+          kickoffAt: "2026-06-11T20:00:00.000Z",
+          summaryHeadline: "部分赛后总结",
+          summaryOfficialFactsStatus: "partial",
+        },
+      ],
+      latestRefresh: {
+        status: "success",
+        finished_at: "2026-06-14T11:44:00.000Z",
+        started_at: "2026-06-14T11:44:00.000Z",
+      },
+      now,
+    }),
+    { shouldRefresh: true, reason: "summary_partial" },
+  );
+});
+
 test("refreshes cached local fallback summaries when an AI provider is configured", () => {
   const previous = process.env.AI_API_KEY;
   process.env.AI_API_KEY = "test-key";

@@ -140,6 +140,7 @@ export async function listMatches({ sql }) {
       m.*,
       s.headline AS summary_headline,
       s.model AS summary_model,
+      s.official_facts_status AS summary_official_facts_status,
       p.headline AS prediction_headline
       , p.model AS prediction_model
     FROM matches m
@@ -169,6 +170,7 @@ export async function getMatchByFifaId({ sql }, fifaId) {
       m.*,
       s.headline AS summary_headline,
       s.model AS summary_model,
+      s.official_facts_status AS summary_official_facts_status,
       p.headline AS prediction_headline
       , p.model AS prediction_model
     FROM matches m
@@ -282,6 +284,7 @@ function rowToMatch(row) {
     hasFinalScore: row.status === "finished" && row.home_score !== null && row.away_score !== null,
     summaryHeadline: row.summary_headline,
     summaryModel: row.summary_model,
+    summaryOfficialFactsStatus: row.summary_official_facts_status,
     predictionHeadline: row.prediction_headline,
     predictionModel: row.prediction_model,
   };

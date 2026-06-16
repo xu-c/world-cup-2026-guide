@@ -1,4 +1,5 @@
-import { fetchFifaMatches } from "./fifa.js";
+import { fetchFifaMatchDetail, fetchFifaMatches } from "./fifa.js";
+import { extractOfficialFacts, factsCompleteness, officialFactsHash } from "./official-facts.js";
 import {
   deleteSeedMatches,
   finishRefreshRun,
@@ -11,7 +12,13 @@ import {
 } from "./db/index.js";
 import { generateInsight } from "./ai.js";
 import { hasConfiguredAiProvider } from "./ai.js";
-import { insightTypeForMatch, isFinishedMatch, shouldGenerateInsight } from "./policies.js";
+import {
+  insightTypeForMatch,
+  isFinishedMatch,
+  shouldGenerateInsight,
+  shouldRefreshPartialSummary,
+  shouldRunFinalSummaryCompletion,
+} from "./policies.js";
 
 export async function refreshWorldCupData(db, { now = new Date(), fetchImpl = fetch } = {}) {
   const startedAt = now.toISOString();
@@ -44,22 +51,64 @@ export async function refreshWorldCupData(db, { now = new Date(), fetchImpl = fe
         ...sourceMatch,
         id: row.id,
       };
+
+      if (insightsGenerated >= maxInsights) {
+        continue;
+      }
+
       const insightForDecision = shouldUpgradeFallbackInsight(existingInsight) ? null : existingInsight;
+      const summaryContext =
+        type === "summary"
+          ? await buildSummaryContext({
+              db,
+              row,
+              sourceMatch,
+              fetchImpl,
+            })
+          : null;
+      const finalCompletion =
+        type === "summary" &&
+        shouldRunFinalSummaryCompletion({ match, summary: existingInsight, now });
+      const shouldGenerate =
+        type === "summary"
+          ? finalCompletion ||
+            summaryNeedsRegeneration(existingInsight, summaryContext.factsHash, match, now) ||
+            shouldGenerateInsight({
+              match,
+              insightType: type,
+              existingInsight: insightForDecision,
+              now,
+            })
+          : shouldGenerateInsight({
+              match,
+              insightType: type,
+              existingInsight: insightForDecision,
+              now,
+            });
 
       if (
-        insightsGenerated < maxInsights &&
-        shouldGenerateInsight({
-          match,
-          insightType: type,
-          existingInsight: insightForDecision,
-          now,
-        })
+        shouldGenerate
       ) {
-        const payload = await generateInsight({ type, match, fetchImpl });
+        const generationMatch =
+          type === "summary"
+            ? {
+                ...match,
+                officialFacts: summaryContext.officialFacts,
+                existingPrediction: summaryContext.existingPrediction,
+                ...(finalCompletion ? { finalCompletion: true } : {}),
+              }
+            : match;
+        const payload = await generateInsight({
+          type,
+          match: generationMatch,
+          fetchImpl,
+          ...(finalCompletion ? { finalCompletion: true } : {}),
+        });
         await upsertInsight(db, row.id, type, {
           ...payload,
           sourceHash: sourceMatch.sourceHash,
           generatedAt: now.toISOString(),
+          ...insightStorageMetadata({ type, match, payload, summaryContext, finalCompletion, now }),
         });
         insightsGenerated += 1;
       }
@@ -79,12 +128,51 @@ function isLockedFinishedMatch(match, insight) {
     match &&
       isFinishedMatch(match) &&
       match.summaryHeadline &&
+      !(insight?.officialFactsStatus === "partial" && !insight?.finalizedAt) &&
       !(hasConfiguredAiProvider() && insight?.model === "local-fallback"),
   );
 }
 
 function shouldUpgradeFallbackInsight(insight) {
   return hasConfiguredAiProvider() && insight?.model === "local-fallback";
+}
+
+async function buildSummaryContext({ db, row, sourceMatch, fetchImpl }) {
+  const detail = await fetchFifaMatchDetail(sourceMatch.fifaId, fetchImpl).catch(() => null);
+  const officialFacts = extractOfficialFacts(sourceMatch, detail);
+  const completeness = factsCompleteness(officialFacts);
+
+  return {
+    existingPrediction: await getInsight(db, row.id, "prediction"),
+    officialFacts,
+    completeness,
+    factsHash: officialFactsHash(officialFacts),
+  };
+}
+
+function summaryNeedsRegeneration(existingSummary, factsHash, match, now) {
+  if (!existingSummary) return true;
+  return Boolean(
+    existingSummary.officialFactsStatus === "partial" &&
+      existingSummary.officialFactsHash !== factsHash &&
+      shouldRefreshPartialSummary({ match, summary: existingSummary, now }),
+  );
+}
+
+function insightStorageMetadata({ type, match, payload, summaryContext, finalCompletion, now }) {
+  if (type !== "summary") {
+    return {
+      frozenAt: new Date(match.kickoffAt) <= now ? now.toISOString() : null,
+    };
+  }
+
+  const officialFactsStatus = finalCompletion ? "complete" : summaryContext.completeness.status;
+  return {
+    officialFactsStatus,
+    officialFactsHash: summaryContext.factsHash,
+    completionNotes: payload.structured?.completionNotes || null,
+    finalizedAt: officialFactsStatus === "complete" ? now.toISOString() : null,
+  };
 }
 
 function getMaxInsightsPerRefresh() {
