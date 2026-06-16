@@ -6,6 +6,7 @@ import {
   validateSummaryV2,
   validateStructuredInsight,
 } from "../src/insight-schemas.js";
+import { buildInsightPrompt, generateInsight } from "../src/ai.js";
 
 test("prediction-v2 validates score, probabilities, and rationale sections", () => {
   const prediction = validatePredictionV2({
@@ -250,3 +251,151 @@ test("summary-v2 rejects unsupported official facts status values", () => {
 test("validateStructuredInsight dispatches by schemaVersion", () => {
   assert.throws(() => validateStructuredInsight({ schemaVersion: "unknown" }), /unknown schemaVersion/);
 });
+
+test("prediction prompt requests score rationale and match script", () => {
+  const prompt = buildInsightPrompt({
+    type: "prediction",
+    match: { homeTeam: "巴西", awayTeam: "摩洛哥", status: "scheduled", kickoffAt: "2026-06-14T20:00:00.000Z" },
+  });
+
+  assert.match(prompt, /prediction-v2/);
+  assert.match(prompt, /predictedScore/);
+  assert.match(prompt, /outcomeProbabilities/);
+  assert.match(prompt, /scoreRationale/);
+  assert.match(prompt, /matchScript/);
+  assert.match(prompt, /tacticalFactors/);
+  assert.match(prompt, /decisiveFactors/);
+  assert.match(prompt, /riskFactors/);
+  assert.match(prompt, /playersToWatch/);
+});
+
+test("summary prompt requests v2 summary fields and forbids unsupported stats", () => {
+  const prompt = buildInsightPrompt({
+    type: "summary",
+    match: { homeTeam: "主队", awayTeam: "客队", status: "finished", homeScore: 2, awayScore: 1 },
+  });
+
+  assert.match(prompt, /summary-v2/);
+  assert.match(prompt, /result/);
+  assert.match(prompt, /matchStory/);
+  assert.match(prompt, /officialEvents/);
+  assert.match(prompt, /technicalFacts/);
+  assert.match(prompt, /aiAnalysis/);
+  assert.match(prompt, /predictionReview/);
+  assert.match(prompt, /officialFactsStatus/);
+  assert.match(prompt, /missingOfficialFields/);
+  assert.match(prompt, /completionNotes/);
+  assert.match(prompt, /Do not add shots/);
+  assert.match(prompt, /shots on target/);
+  assert.match(prompt, /possession/);
+  assert.match(prompt, /xG/);
+  assert.match(prompt, /injuries/);
+  assert.match(prompt, /quotes/);
+  assert.match(prompt, /unavailable player status/);
+});
+
+test("generateInsight returns structured prediction-v2 payload", async () => {
+  const previous = {
+    AI_BASE_URL: process.env.AI_BASE_URL,
+    AI_API_KEY: process.env.AI_API_KEY,
+    AI_MODEL: process.env.AI_MODEL,
+  };
+  process.env.AI_BASE_URL = "https://provider.example/v1";
+  process.env.AI_API_KEY = "test-key";
+  process.env.AI_MODEL = "mimo-v2.5-pro";
+
+  try {
+    const result = await generateInsight({
+      type: "prediction",
+      match: { homeTeam: "巴西", awayTeam: "摩洛哥", status: "scheduled", kickoffAt: "2026-06-14T20:00:00.000Z" },
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: JSON.stringify({
+            schemaVersion: "prediction-v2",
+            type: "prediction",
+            headline: "巴西小胜机会更高",
+            shortText: "巴西更可能控制节奏。摩洛哥需要依靠反击制造威胁。",
+            predictedScore: { home: 2, away: 1, label: "2-1" },
+            outcomeProbabilities: { homeWin: 0.52, draw: 0.25, awayWin: 0.23 },
+            matchScript: { summary: "巴西主导推进。", firstHalf: "上半场巴西更主动。", secondHalf: "下半场空间增加。" },
+            scoreRationale: ["巴西机会质量更高", "摩洛哥反击可能进球"],
+            tacticalFactors: ["巴西边路推进", "摩洛哥压缩中路"],
+            decisiveFactors: ["定位球", "转换效率"],
+            riskFactors: ["早段进球改变节奏"],
+            playersToWatch: ["巴西前场", "摩洛哥防线"],
+            confidence: "medium",
+            generatedFor: "prediction",
+          }) } }],
+        }),
+      }),
+    });
+
+    assert.equal(result.insight.headline, "巴西小胜机会更高");
+    assert.deepEqual(result.insight.probabilities, { homeWin: 0.52, draw: 0.25, awayWin: 0.23 });
+    assert.equal(result.structured.predictedScore.label, "2-1");
+    assert.equal(result.schemaVersion, "prediction-v2");
+    assert.equal(result.model, "mimo-v2.5-pro");
+    assert.equal(result.promptVersion, "world-cup-2026-insight-v2");
+  } finally {
+    restoreEnv("AI_BASE_URL", previous.AI_BASE_URL);
+    restoreEnv("AI_API_KEY", previous.AI_API_KEY);
+    restoreEnv("AI_MODEL", previous.AI_MODEL);
+  }
+});
+
+test("generateInsight fallback includes valid legacy and structured prediction payloads", async () => {
+  const previous = {
+    AI_API_KEY: process.env.AI_API_KEY,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  };
+  delete process.env.AI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  try {
+    const result = await generateInsight({
+      type: "prediction",
+      match: { homeTeam: "W61", awayTeam: "W62", status: "scheduled" },
+    });
+
+    assert.equal(result.insight.generatedFor, "prediction");
+    assert.equal(result.structured.schemaVersion, "prediction-v2");
+    assert.equal(result.schemaVersion, "prediction-v2");
+    assert.equal(validateStructuredInsight(result.structured, "prediction").schemaVersion, "prediction-v2");
+  } finally {
+    restoreEnv("AI_API_KEY", previous.AI_API_KEY);
+    restoreEnv("OPENAI_API_KEY", previous.OPENAI_API_KEY);
+  }
+});
+
+test("generateInsight fallback includes valid legacy and structured summary payloads", async () => {
+  const previous = {
+    AI_API_KEY: process.env.AI_API_KEY,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  };
+  delete process.env.AI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  try {
+    const result = await generateInsight({
+      type: "summary",
+      match: { homeTeam: "主队", awayTeam: "客队", status: "finished", homeScore: 2, awayScore: 1 },
+    });
+
+    assert.equal(result.insight.generatedFor, "summary");
+    assert.equal(result.structured.schemaVersion, "summary-v2");
+    assert.equal(result.schemaVersion, "summary-v2");
+    assert.equal(validateStructuredInsight(result.structured, "summary").schemaVersion, "summary-v2");
+  } finally {
+    restoreEnv("AI_API_KEY", previous.AI_API_KEY);
+    restoreEnv("OPENAI_API_KEY", previous.OPENAI_API_KEY);
+  }
+});
+
+function restoreEnv(name, value) {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+}

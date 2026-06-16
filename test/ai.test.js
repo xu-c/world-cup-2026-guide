@@ -25,9 +25,13 @@ test("summary prompt requires a stable JSON schema with fixed sections", () => {
 
   assert.match(prompt, /ONLY valid JSON/);
   assert.match(prompt, /"headline"/);
-  assert.match(prompt, /"keyMoments"/);
-  assert.match(prompt, /"tacticalNotes"/);
-  assert.match(prompt, /"confidence"/);
+  assert.match(prompt, /"summary-v2"/);
+  assert.match(prompt, /"result"/);
+  assert.match(prompt, /"matchStory"/);
+  assert.match(prompt, /"officialEvents"/);
+  assert.match(prompt, /"technicalFacts"/);
+  assert.match(prompt, /"aiAnalysis"/);
+  assert.match(prompt, /"officialFactsStatus"/);
 });
 
 test("prediction prompt requires probability fields and no fabricated certainty", () => {
@@ -100,12 +104,22 @@ test("custom AI provider uses OpenAI-compatible chat completions settings", asyn
               {
                 message: {
                   content: JSON.stringify({
+                    schemaVersion: "prediction-v2",
+                    type: "prediction",
                     headline: "巴西对阵摩洛哥前瞻",
                     shortText: "两队风格差异明显，巴西控球能力更强。摩洛哥需要依靠防守转换制造机会。",
-                    keyMoments: ["开局控球权争夺", "定位球防守质量"],
-                    tacticalNotes: ["巴西可能主导边路推进", "摩洛哥需要压缩中路空间"],
+                    predictedScore: { home: 2, away: 1, label: "2-1" },
+                    outcomeProbabilities: { homeWin: 0.54, draw: 0.25, awayWin: 0.21 },
+                    matchScript: {
+                      summary: "巴西更可能控制节奏，摩洛哥等待转换机会。",
+                      firstHalf: "巴西上半场可能更主动。",
+                      secondHalf: "摩洛哥下半场需要提高转换效率。",
+                    },
+                    scoreRationale: ["巴西前场推进点更多", "摩洛哥反击仍有得分可能"],
+                    tacticalFactors: ["巴西可能主导边路推进", "摩洛哥需要压缩中路空间"],
+                    decisiveFactors: ["定位球防守质量", "转换进攻效率"],
+                    riskFactors: ["早段进球会改变节奏", "赛前信息有限"],
                     playersToWatch: ["巴西前场", "摩洛哥门将"],
-                    probabilities: { homeWin: 0.54, draw: 0.25, awayWin: 0.21 },
                     confidence: "medium",
                     generatedFor: "prediction",
                   }),
@@ -123,6 +137,7 @@ test("custom AI provider uses OpenAI-compatible chat completions settings", asyn
     assert.equal(request.body.response_format.type, "json_object");
     assert.equal(result.model, "mimo-v2.5-pro");
     assert.equal(result.insight.generatedFor, "prediction");
+    assert.equal(result.structured.schemaVersion, "prediction-v2");
   } finally {
     restoreEnv("AI_BASE_URL", previous.AI_BASE_URL);
     restoreEnv("AI_API_KEY", previous.AI_API_KEY);
@@ -193,6 +208,7 @@ test("invalid AI provider JSON falls back to a valid local insight", async () =>
     assert.equal(result.model, "local-fallback");
     assert.equal(result.insight.playersToWatch.length, 2);
     assert.equal(result.insight.generatedFor, "prediction");
+    assert.equal(result.structured.schemaVersion, "prediction-v2");
   } finally {
     restoreEnv("AI_BASE_URL", previous.AI_BASE_URL);
     restoreEnv("AI_API_KEY", previous.AI_API_KEY);
