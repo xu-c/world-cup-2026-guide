@@ -7,7 +7,7 @@
 - 推荐平台：Vercel + Neon Postgres。前端由 Vercel 静态托管，API 使用 Vercel Functions，刷新任务使用 Vercel Cron。
 - 本地开发：Node.js HTTP 服务 + Node 22 内置 SQLite，默认写入 `./data/worldcup.db`。
 - 云端数据库：配置 `DATABASE_URL` 后自动使用 Neon/Postgres；未配置时使用本地 SQLite。
-- AI：服务端刷新任务调用 OpenAI Responses API。未配置 `OPENAI_API_KEY` 时使用本地结构化占位内容，保证项目可直接运行。
+- AI：服务端刷新任务调用 OpenAI-compatible chat completions API。未配置 `AI_API_KEY` / `OPENAI_API_KEY` 时使用本地结构化占位内容，保证项目可直接运行。
 - FIFA 数据：`src/fifa.js` 是独立适配器。当前生产环境使用 FIFA 官方 calendar API：`https://api.fifa.com/api/v3/calendar/matches?language=zh&count=500&idCompetition=17&idSeason=285023`。未配置时使用内置示例赛程，方便本地演示。
 
 ## 云平台评估
@@ -72,9 +72,10 @@ cp .env.example .env
 
 服务端刷新入口是 `refreshWorldCupData`：
 
-- 已完赛且已有比分：比赛数据视为锁定；如果还没有赛后总结，只生成一次 summary，写库后不再重复调用 AI。
-- 当天未完赛：比赛数据 15 分钟 TTL；预测 120 分钟 TTL。
-- 进行中比赛：比赛数据 15 分钟 TTL；AI 内容 30 分钟 TTL。
+- 已完赛且已有比分：如果还没有赛后总结，会用官方事实生成 summary；如果 summary 仍缺少官方详情，会按限频继续补全。
+- 赛后总结完整后锁定；完赛超过两天仍不完整时，会执行一次最终补全，然后把缺失字段低调标记并停止后续补全刷新。
+- 当天未完赛：比赛数据 15 分钟 TTL；预测只允许在开赛前生成或更新。
+- 进行中比赛：比赛数据 15 分钟 TTL；不再生成或更新赛前预测。
 - 明天及以后比赛：比赛数据 12 小时 TTL；预测 12 小时 TTL。
 
 用户访问页面只读取数据库，不直接调用 FIFA 或 AI。
@@ -85,30 +86,73 @@ cp .env.example .env
 - 用户访问 `GET /api/matches` 时，接口先读取数据库并立即返回当前缓存。
 - 返回前会用 Vercel `waitUntil` 注册一个后台刷新任务；后台任务会先检查限频策略，不到时间不会请求 FIFA 或 AI。
 - 如果最近已有刷新任务正在运行，新的访问不会再启动刷新，避免并发访问导致重复刷新。
-- 已完赛且已有 summary 的比赛在后续刷新中会被跳过，即使同一次刷新是因为别的未完赛比赛触发。
+- 已完赛且已有完整 summary 的比赛在后续刷新中会被跳过，即使同一次刷新是因为别的未完赛比赛触发。
 
 ## AI 输出格式
 
-AI 必须返回固定 JSON：
+AI 必须返回固定 JSON。赛前预测和赛后总结使用独立结构：
 
 ```json
 {
+  "schemaVersion": "prediction-v2",
+  "type": "prediction",
   "headline": "string",
-  "shortText": "string",
-  "keyMoments": ["string", "string"],
-  "tacticalNotes": ["string", "string"],
-  "playersToWatch": ["string", "string"],
-  "probabilities": {
+  "predictedScore": { "home": 1, "away": 1, "label": "1-1" },
+  "outcomeProbabilities": {
     "homeWin": 0.36,
     "draw": 0.28,
     "awayWin": 0.36
   },
-  "confidence": "low",
-  "generatedFor": "summary"
+  "matchScript": {
+    "summary": "string",
+    "firstHalf": "string",
+    "secondHalf": "string"
+  },
+  "scoreRationale": ["string"],
+  "tacticalFactors": ["string"],
+  "decisiveFactors": ["string"],
+  "riskFactors": ["string"],
+  "confidence": "medium",
+  "generatedFor": "prediction"
 }
 ```
 
-`src/ai.js` 会解析、去除 markdown 代码块、校验字段，并拒绝不符合结构的内容。
+```json
+{
+  "schemaVersion": "summary-v2",
+  "type": "summary",
+  "headline": "string",
+  "result": { "homeScore": 2, "awayScore": 1, "winner": "主队", "resultText": "主队 2-1 取胜" },
+  "matchStory": {
+    "summary": "string",
+    "turningPoint": "string",
+    "closingPhase": "string"
+  },
+  "officialEvents": {
+    "goals": [],
+    "cards": [],
+    "substitutions": []
+  },
+  "technicalFacts": {
+    "formations": { "home": "4-3-3", "away": "4-2-3-1" },
+    "attendance": 80824,
+    "venue": "string",
+    "officials": []
+  },
+  "aiAnalysis": {
+    "tacticalSummary": [],
+    "keyPlayerImpact": [],
+    "resultExplanation": []
+  },
+  "predictionReview": null,
+  "officialFactsStatus": "complete",
+  "missingOfficialFields": []
+}
+```
+
+赛后技术事实只包含官方可稳定获取的字段：进球、红黄牌、换人、阵型、场馆、上座人数、裁判。射门、射正、控球率、xG 等未确认官方稳定来源的项目不会作为固定技术统计展示。
+
+`src/ai.js` 会解析、去除 markdown 代码块、校验字段，并把 v2 结构派生为旧字段以兼容已有展示和存储逻辑。预测一旦开赛即冻结，赛后作为“赛前预测回看”展示。
 
 ## API
 
