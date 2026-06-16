@@ -60,6 +60,14 @@ export function migrate(db) {
       message TEXT
     );
   `);
+
+  ensureColumn(db, "insights", "structured_json", "TEXT");
+  ensureColumn(db, "insights", "schema_version", "TEXT");
+  ensureColumn(db, "insights", "official_facts_status", "TEXT");
+  ensureColumn(db, "insights", "official_facts_hash", "TEXT");
+  ensureColumn(db, "insights", "completion_notes_json", "TEXT");
+  ensureColumn(db, "insights", "frozen_at", "TEXT");
+  ensureColumn(db, "insights", "finalized_at", "TEXT");
 }
 
 export function upsertMatch(db, match) {
@@ -208,11 +216,15 @@ export function upsertInsight(db, matchId, type, payload) {
     INSERT INTO insights (
       match_id, type, headline, short_text, key_moments_json, tactical_notes_json,
       players_to_watch_json, probabilities_json, confidence, generated_for, model,
-      prompt_version, source_hash, generated_at
+      prompt_version, source_hash, generated_at, structured_json, schema_version,
+      official_facts_status, official_facts_hash, completion_notes_json, frozen_at,
+      finalized_at
     ) VALUES (
       :matchId, :type, :headline, :shortText, :keyMomentsJson, :tacticalNotesJson,
       :playersToWatchJson, :probabilitiesJson, :confidence, :generatedFor, :model,
-      :promptVersion, :sourceHash, :generatedAt
+      :promptVersion, :sourceHash, :generatedAt, :structuredJson, :schemaVersion,
+      :officialFactsStatus, :officialFactsHash, :completionNotesJson, :frozenAt,
+      :finalizedAt
     )
     ON CONFLICT(match_id, type) DO UPDATE SET
       headline = excluded.headline,
@@ -226,7 +238,14 @@ export function upsertInsight(db, matchId, type, payload) {
       model = excluded.model,
       prompt_version = excluded.prompt_version,
       source_hash = excluded.source_hash,
-      generated_at = excluded.generated_at
+      generated_at = excluded.generated_at,
+      structured_json = excluded.structured_json,
+      schema_version = excluded.schema_version,
+      official_facts_status = excluded.official_facts_status,
+      official_facts_hash = excluded.official_facts_hash,
+      completion_notes_json = excluded.completion_notes_json,
+      frozen_at = excluded.frozen_at,
+      finalized_at = excluded.finalized_at
   `).run({
     matchId,
     type,
@@ -242,6 +261,13 @@ export function upsertInsight(db, matchId, type, payload) {
     promptVersion: payload.promptVersion,
     sourceHash: payload.sourceHash,
     generatedAt: payload.generatedAt,
+    structuredJson: optionalJson(payload.structured),
+    schemaVersion: payload.schemaVersion ?? payload.structured?.schemaVersion ?? null,
+    officialFactsStatus: payload.officialFactsStatus ?? null,
+    officialFactsHash: payload.officialFactsHash ?? null,
+    completionNotesJson: optionalJson(payload.completionNotes),
+    frozenAt: payload.frozenAt ?? null,
+    finalizedAt: payload.finalizedAt ?? null,
   });
 }
 
@@ -306,5 +332,30 @@ function rowToInsight(row) {
     promptVersion: row.prompt_version,
     sourceHash: row.source_hash,
     generatedAt: row.generated_at,
+    structured: parseOptionalJson(row.structured_json),
+    schemaVersion: row.schema_version,
+    officialFactsStatus: row.official_facts_status,
+    officialFactsHash: row.official_facts_hash,
+    completionNotes: parseOptionalJson(row.completion_notes_json),
+    frozenAt: row.frozen_at,
+    finalizedAt: row.finalized_at,
   };
+}
+
+function ensureColumn(db, tableName, columnName, columnType) {
+  const hasColumn = db
+    .prepare(`PRAGMA table_info(${tableName})`)
+    .all()
+    .some((column) => column.name === columnName);
+  if (!hasColumn) {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnType}`);
+  }
+}
+
+function optionalJson(value) {
+  return value === undefined ? null : JSON.stringify(value);
+}
+
+function parseOptionalJson(value) {
+  return value === null || value === undefined ? null : JSON.parse(value);
 }
