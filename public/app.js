@@ -445,6 +445,7 @@ function canRenderStructuredSummary(summary) {
     Array.isArray(summary.officialEvents.cards) &&
     Array.isArray(summary.officialEvents.substitutions) &&
     isObject(summary.technicalFacts) &&
+    Array.isArray(summary.technicalFacts.officials) &&
     isObject(summary.aiAnalysis) &&
     Array.isArray(summary.aiAnalysis.tacticalSummary) &&
     Array.isArray(summary.aiAnalysis.keyPlayerImpact) &&

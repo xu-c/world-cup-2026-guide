@@ -101,3 +101,7 @@ test("frontend guards structured summary before v2 rendering", () => {
 test("frontend escapes official attendance values", () => {
   assert.match(appSource, /escapeHtml\(String\(facts\.attendance \?\? "暂缺"\)\)/);
 });
+
+test("frontend guards technical fact officials before summary v2 rendering", () => {
+  assert.match(appSource, /Array\.isArray\(summary\.technicalFacts\.officials\)/);
+});
