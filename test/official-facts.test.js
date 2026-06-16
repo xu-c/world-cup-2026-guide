@@ -129,6 +129,33 @@ test("extractOfficialFacts prefers stored match score over detail score", () => 
   });
 });
 
+test("extractOfficialFacts normalizes string goal and card codes", () => {
+  const facts = extractOfficialFacts({
+    homeTeam: "主队",
+    awayTeam: "客队",
+    homeScore: 1,
+    awayScore: 0,
+    raw: {
+      HomeTeam: {
+        TeamName: [{ Locale: "zh-CN", Description: "主队" }],
+        Players: [{ IdPlayer: "p1", ShortName: "射手" }],
+        Goals: [{ IdPlayer: "p1", Minute: "45'", Type: "3" }],
+        Bookings: [{ IdPlayer: "p1", Minute: "46'", Card: "1" }],
+        Substitutions: [],
+      },
+      AwayTeam: {
+        TeamName: [{ Locale: "zh-CN", Description: "客队" }],
+        Goals: [],
+        Bookings: [],
+        Substitutions: [],
+      },
+    },
+  });
+
+  assert.equal(facts.officialEvents.goals[0].type, "penalty");
+  assert.equal(facts.officialEvents.cards[0].card, "yellow");
+});
+
 test("factsCompleteness is partial when approved detail arrays are unavailable", () => {
   const facts = extractOfficialFacts({
     homeTeam: "主队",

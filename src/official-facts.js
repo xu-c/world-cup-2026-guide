@@ -157,17 +157,24 @@ function winnerText(homeScore, awayScore, homeName, awayName) {
 }
 
 function goalType(value) {
-  if (value === 1 || String(value).toLowerCase() === "own_goal") return "own_goal";
-  if (value === 3 || String(value).toLowerCase() === "penalty") return "penalty";
+  const code = normalizedCode(value);
+  if (code === 1 || code === "own_goal") return "own_goal";
+  if (code === 3 || code === "penalty") return "penalty";
   return "goal";
 }
 
 function cardType(value) {
-  const normalized = String(value ?? "").toLowerCase();
-  if (value === 1 || normalized === "yellow" || normalized === "yellow_card") return "yellow";
-  if (value === 2 || normalized === "red" || normalized === "red_card") return "red";
-  if (value === 3 || normalized === "second_yellow") return "second_yellow";
+  const code = normalizedCode(value);
+  if (code === 1 || code === "yellow" || code === "yellow_card") return "yellow";
+  if (code === 2 || code === "red" || code === "red_card") return "red";
+  if (code === 3 || code === "second_yellow") return "second_yellow";
   return "unknown";
+}
+
+function normalizedCode(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (/^\d+$/.test(normalized)) return Number(normalized);
+  return normalized;
 }
 
 function officials(raw) {
