@@ -56,6 +56,52 @@ test("prediction-v2 rejects mismatched score labels", () => {
   );
 });
 
+test("prediction-v2 rejects null predicted score numbers", () => {
+  assert.throws(
+    () =>
+      validatePredictionV2({
+        schemaVersion: "prediction-v2",
+        type: "prediction",
+        headline: "比分字段错误",
+        shortText: "这是一条结构完整但主队比分字段错误的预测。",
+        predictedScore: { home: null, away: 1, label: "0-1" },
+        outcomeProbabilities: { homeWin: 0.34, draw: 0.33, awayWin: 0.33 },
+        matchScript: { summary: "a", firstHalf: "b", secondHalf: "c" },
+        scoreRationale: ["a"],
+        tacticalFactors: ["a"],
+        decisiveFactors: ["a"],
+        riskFactors: ["a"],
+        playersToWatch: ["a"],
+        confidence: "low",
+        generatedFor: "prediction",
+      }),
+    /predictedScore.home/,
+  );
+});
+
+test("prediction-v2 rejects null probabilities", () => {
+  assert.throws(
+    () =>
+      validatePredictionV2({
+        schemaVersion: "prediction-v2",
+        type: "prediction",
+        headline: "概率字段错误",
+        shortText: "这是一条结构完整但主胜概率字段错误的预测。",
+        predictedScore: { home: 1, away: 1, label: "1-1" },
+        outcomeProbabilities: { homeWin: null, draw: 0.5, awayWin: 0.5 },
+        matchScript: { summary: "a", firstHalf: "b", secondHalf: "c" },
+        scoreRationale: ["a"],
+        tacticalFactors: ["a"],
+        decisiveFactors: ["a"],
+        riskFactors: ["a"],
+        playersToWatch: ["a"],
+        confidence: "low",
+        generatedFor: "prediction",
+      }),
+    /outcomeProbabilities.homeWin/,
+  );
+});
+
 test("prediction-v2 rejects unsupported confidence values", () => {
   assert.throws(
     () =>

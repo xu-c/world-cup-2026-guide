@@ -298,13 +298,30 @@ function requireTextArray(value, name, min, max) {
 }
 
 function requireNonNegativeInteger(value, name) {
-  const number = Number(value);
+  const number = requireFiniteNumber(value, name);
   if (!Number.isInteger(number) || number < 0) throw new Error(`${name} must be a non-negative integer`);
   return number;
 }
 
 function requireProbability(value, name) {
-  const number = Number(value);
+  const number = requireFiniteNumber(value, name);
   if (!Number.isFinite(number) || number < 0 || number > 1) throw new Error(`${name} must be between 0 and 1`);
   return number;
+}
+
+function requireFiniteNumber(value, name) {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error(`${name} must be a finite number`);
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) throw new Error(`${name} must be a finite number`);
+    const number = Number(trimmed);
+    if (!Number.isFinite(number)) throw new Error(`${name} must be a finite number`);
+    return number;
+  }
+
+  throw new Error(`${name} must be a finite number`);
 }
