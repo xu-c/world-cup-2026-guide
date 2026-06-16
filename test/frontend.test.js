@@ -31,6 +31,14 @@ test("date navigation is the only match list control", () => {
   assert.doesNotMatch(appSource, /querySelectorAll\("\.filter"\)/);
 });
 
+test("page soft-refreshes match data without reloading", () => {
+  assert.match(appSource, /ACTIVE_REFRESH_INTERVAL_MS = 60_000/);
+  assert.match(appSource, /document\.visibilityState === "hidden"/);
+  assert.match(appSource, /matchDataSignature/);
+  assert.match(appSource, /applyMatchData\(data, \{ preserveSelection: true \}\)/);
+  assert.doesNotMatch(appSource, /location\.reload/);
+});
+
 test("page declares favicon and browser metadata", () => {
   assert.match(indexSource, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml" \/>/);
   assert.match(indexSource, /<meta name="theme-color" content="#0d704c" \/>/);

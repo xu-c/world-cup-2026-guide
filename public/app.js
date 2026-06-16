@@ -1,8 +1,14 @@
 let currentDateKey = null;
 let matches = [];
 let selectedMatchId = null;
+let latestMatchesSignature = "";
 let pendingWheelDelta = 0;
 let wheelAnimationFrame = null;
+let softRefreshTimer = null;
+let softRefreshInFlight = false;
+
+const ACTIVE_REFRESH_INTERVAL_MS = 60_000;
+const IDLE_REFRESH_INTERVAL_MS = 5 * 60_000;
 
 const matchesEl = document.querySelector("#matches");
 const detailEl = document.querySelector("#detail");
@@ -34,14 +40,61 @@ dateNavEl.addEventListener(
 );
 
 await loadMatches();
+scheduleSoftRefresh();
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") scheduleSoftRefresh();
+});
 
 async function loadMatches() {
   const response = await fetch("/api/matches");
   const data = await response.json();
+  applyMatchData(data);
+}
+
+function applyMatchData(data, options = {}) {
+  const previousDateKey = currentDateKey;
+  const previousSelectedMatchId = selectedMatchId;
   matches = data.matches;
-  initializeCurrentDate();
+  latestMatchesSignature = matchDataSignature(data);
+
+  if (options.preserveSelection) {
+    preserveCurrentSelection(previousDateKey, previousSelectedMatchId);
+  } else {
+    initializeCurrentDate();
+  }
+
   renderDateNav();
   renderMatches();
+}
+
+async function refreshMatchesIfChanged() {
+  if (softRefreshInFlight) return;
+  if (document.visibilityState === "hidden") {
+    scheduleSoftRefresh();
+    return;
+  }
+
+  softRefreshInFlight = true;
+  try {
+    const response = await fetch("/api/matches");
+    const data = await response.json();
+    const nextSignature = matchDataSignature(data);
+    if (nextSignature !== latestMatchesSignature) {
+      applyMatchData(data, { preserveSelection: true });
+    }
+  } catch (error) {
+    console.error("Soft refresh failed", error);
+  } finally {
+    softRefreshInFlight = false;
+    scheduleSoftRefresh();
+  }
+}
+
+function scheduleSoftRefresh() {
+  if (softRefreshTimer) clearTimeout(softRefreshTimer);
+  const interval = shouldPollActively() ? ACTIVE_REFRESH_INTERVAL_MS : IDLE_REFRESH_INTERVAL_MS;
+  softRefreshTimer = setTimeout(refreshMatchesIfChanged, interval);
 }
 
 function renderMatches() {
@@ -216,6 +269,25 @@ function initializeCurrentDate() {
   selectedMatchId = firstVisibleMatch()?.id ?? null;
 }
 
+function preserveCurrentSelection(previousDateKey, previousSelectedMatchId) {
+  const dateGroups = buildDateGroups();
+  if (dateGroups.length === 0) {
+    currentDateKey = null;
+    selectedMatchId = null;
+    return;
+  }
+
+  const previousDateStillExists = dateGroups.some((group) => group.key === previousDateKey);
+  if (previousDateStillExists) {
+    currentDateKey = previousDateKey;
+  } else {
+    initializeCurrentDate();
+  }
+
+  const selectedStillExists = visibleMatches().some((match) => match.id === previousSelectedMatchId);
+  selectedMatchId = selectedStillExists ? previousSelectedMatchId : firstVisibleMatch()?.id ?? null;
+}
+
 function buildDateGroups() {
   const groups = new Map();
   for (const match of matches) {
@@ -240,6 +312,24 @@ function visibleMatches() {
 
 function firstVisibleMatch() {
   return visibleMatches()[0] || null;
+}
+
+function shouldPollActively() {
+  return visibleMatches().some((match) => match.status !== "finished");
+}
+
+function matchDataSignature(data) {
+  return JSON.stringify(
+    data.matches.map((match) => [
+      match.id,
+      match.status,
+      match.homeScore,
+      match.awayScore,
+      match.sourceHash,
+      match.summaryHeadline,
+      match.predictionHeadline,
+    ]),
+  );
 }
 
 function dateKey(date) {
