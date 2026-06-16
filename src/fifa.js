@@ -17,6 +17,19 @@ export async function fetchFifaMatches(fetchImpl = fetch) {
   return normalizeFifaPayload(payload);
 }
 
+export async function fetchFifaMatchDetail(fifaId, fetchImpl = fetch) {
+  const baseUrl = process.env.FIFA_MATCH_DETAIL_BASE_URL || "https://api.fifa.com/api/v3/live/football";
+  const response = await fetchImpl(`${baseUrl.replace(/\/+$/, "")}/${encodeURIComponent(fifaId)}`, {
+    headers: { Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`FIFA match detail request failed: ${response.status} ${await response.text()}`);
+  }
+
+  return response.json();
+}
+
 export function normalizeFifaPayload(payload) {
   const candidates = Array.isArray(payload)
     ? payload
