@@ -282,6 +282,9 @@ test("summary prompt requests v2 summary fields and forbids unsupported stats", 
   assert.match(prompt, /technicalFacts/);
   assert.match(prompt, /aiAnalysis/);
   assert.match(prompt, /predictionReview/);
+  assert.match(prompt, /predictionReview.*object \| null/s);
+  assert.match(prompt, /Do not fabricate predictionReview/);
+  assert.match(prompt, /existingPrediction/);
   assert.match(prompt, /officialFactsStatus/);
   assert.match(prompt, /missingOfficialFields/);
   assert.match(prompt, /completionNotes/);
@@ -365,6 +368,72 @@ test("generateInsight fallback includes valid legacy and structured prediction p
   } finally {
     restoreEnv("AI_API_KEY", previous.AI_API_KEY);
     restoreEnv("OPENAI_API_KEY", previous.OPENAI_API_KEY);
+  }
+});
+
+test("generateInsight falls back when provider envelope omits message content", async () => {
+  const previous = {
+    AI_BASE_URL: process.env.AI_BASE_URL,
+    AI_API_KEY: process.env.AI_API_KEY,
+    AI_MODEL: process.env.AI_MODEL,
+  };
+  process.env.AI_BASE_URL = "https://provider.example/v1";
+  process.env.AI_API_KEY = "test-key";
+  process.env.AI_MODEL = "mimo-v2.5-pro";
+
+  try {
+    const result = await generateInsight({
+      type: "prediction",
+      match: { homeTeam: "W61", awayTeam: "W62", status: "scheduled" },
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({ choices: [{}] }),
+      }),
+    });
+
+    assert.equal(result.model, "local-fallback");
+    assert.equal(result.structured.schemaVersion, "prediction-v2");
+    assert.equal(result.schemaVersion, "prediction-v2");
+    assert.equal(result.insight.generatedFor, "prediction");
+    assert.equal(validateStructuredInsight(result.structured, "prediction").schemaVersion, "prediction-v2");
+  } finally {
+    restoreEnv("AI_BASE_URL", previous.AI_BASE_URL);
+    restoreEnv("AI_API_KEY", previous.AI_API_KEY);
+    restoreEnv("AI_MODEL", previous.AI_MODEL);
+  }
+});
+
+test("generateInsight falls back when provider returns invalid JSON body", async () => {
+  const previous = {
+    AI_BASE_URL: process.env.AI_BASE_URL,
+    AI_API_KEY: process.env.AI_API_KEY,
+    AI_MODEL: process.env.AI_MODEL,
+  };
+  process.env.AI_BASE_URL = "https://provider.example/v1";
+  process.env.AI_API_KEY = "test-key";
+  process.env.AI_MODEL = "mimo-v2.5-pro";
+
+  try {
+    const result = await generateInsight({
+      type: "summary",
+      match: { homeTeam: "主队", awayTeam: "客队", status: "finished", homeScore: 1, awayScore: 1 },
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => {
+          throw new SyntaxError("Unexpected token");
+        },
+      }),
+    });
+
+    assert.equal(result.model, "local-fallback");
+    assert.equal(result.structured.schemaVersion, "summary-v2");
+    assert.equal(result.schemaVersion, "summary-v2");
+    assert.equal(result.insight.generatedFor, "summary");
+    assert.equal(validateStructuredInsight(result.structured, "summary").schemaVersion, "summary-v2");
+  } finally {
+    restoreEnv("AI_BASE_URL", previous.AI_BASE_URL);
+    restoreEnv("AI_API_KEY", previous.AI_API_KEY);
+    restoreEnv("AI_MODEL", previous.AI_MODEL);
   }
 });
 

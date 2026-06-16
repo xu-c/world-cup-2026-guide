@@ -20,6 +20,7 @@ export function buildInsightPrompt({ type, match }) {
     "For summaries, use officialEvents and technicalFacts from supplied facts only.",
     "Do not add shots, shots on target, possession, xG, injuries, quotes, or unavailable player status.",
     "If player data is not supplied, use team-level wording instead of inventing player names.",
+    "Do not fabricate predictionReview; set predictionReview to null unless existingPrediction is supplied in Match facts.",
     "",
     "Required JSON schema:",
     JSON.stringify(schema, null, 2),
@@ -99,9 +100,9 @@ export async function generateInsight({ type, match, fetchImpl = fetch }) {
     throw new Error(`AI request failed: ${response.status} ${await response.text()}`);
   }
 
-  const payload = await response.json();
-  const text = extractChatCompletionText(payload);
   try {
+    const payload = await response.json();
+    const text = extractChatCompletionText(payload);
     const structured = parseStructuredInsight(text, type, match);
     return {
       insight: legacyInsightFromStructured(structured),
@@ -432,18 +433,8 @@ function summarySchema() {
       keyPlayerImpact: ["string"],
       resultExplanation: ["string"],
     },
-    predictionReview: {
-      predictedScore: "string",
-      actualScore: "string",
-      scoreHit: "boolean",
-      outcomeHit: "boolean",
-      preMatchProbabilities: {
-        homeWin: "number from 0 to 1",
-        draw: "number from 0 to 1",
-        awayWin: "number from 0 to 1",
-      },
-      reviewText: "string",
-    },
+    predictionReview:
+      "object | null; use null when no existingPrediction is supplied; object fields: predictedScore, actualScore, scoreHit, outcomeHit, preMatchProbabilities, reviewText",
     officialFactsStatus: "complete | partial",
     missingOfficialFields: ["string"],
     completionNotes: {
