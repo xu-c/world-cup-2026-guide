@@ -58,8 +58,8 @@ test("favicon is an SVG icon asset", () => {
   assert.match(faviconSource, /<svg/);
   assert.match(faviconSource, /viewBox="0 0 64 64"/);
   assert.match(faviconSource, /<title>足球图标<\/title>/);
-  assert.match(faviconSource, /class="soccer-panel"/);
-  assert.match(faviconSource, /class="soccer-seam"/);
+  assert.match(faviconSource, /⚽/);
+  assert.match(faviconSource, /Apple Color Emoji/);
 });
 
 test("frontend renders structured prediction score and rationale", () => {
