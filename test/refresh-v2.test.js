@@ -136,6 +136,45 @@ test("finished summary generation uses FIFA detail facts and existing prediction
   }
 });
 
+test("legacy finished summaries upgrade to structured summary v2", async () => {
+  const context = createDb();
+  const existing = upsertMatch(context.db, normalizedFinishedMatch("legacy-summary"));
+  upsertInsight(context.db, existing.id, "summary", legacySummaryPayload());
+
+  const previous = withEnv({
+    FIFA_MATCHES_URL: "https://fifa.example/matches",
+    FIFA_MATCH_DETAIL_BASE_URL: "https://fifa.example/detail",
+    AI_API_KEY: "test-key",
+    AI_BASE_URL: "https://provider.example/v1",
+    AI_MODEL: "mimo-v2.5-pro",
+  });
+  let aiCalled = false;
+
+  try {
+    await refreshWorldCupData(context.store, {
+      now: new Date("2026-06-14T23:00:00.000Z"),
+      fetchImpl: async (url) => {
+        const href = String(url);
+        if (href.includes("provider.example")) {
+          aiCalled = true;
+          return aiResponse(summaryV2({ headline: "升级后的结构化摘要", officialFactsStatus: "complete" }));
+        }
+        if (href.includes("/detail/legacy-summary")) return jsonResponse(completeDetail());
+        return jsonResponse({ Results: [finishedMatch({ fifaId: "legacy-summary" })] });
+      },
+    });
+
+    const summary = getInsight(context.db, existing.id, "summary");
+    assert.equal(aiCalled, true);
+    assert.equal(summary.headline, "升级后的结构化摘要");
+    assert.equal(summary.schemaVersion, "summary-v2");
+    assert.equal(summary.officialFactsStatus, "complete");
+  } finally {
+    previous.restore();
+    context.close();
+  }
+});
+
 test("partial summaries do not regenerate when official facts are unchanged", async () => {
   const context = createDb();
   const sourceMatch = finishedMatch({ fifaId: "partial-unchanged" });
@@ -516,6 +555,25 @@ function predictionPayload() {
     promptVersion: "test",
     sourceHash: "source-hash",
     generatedAt: "2026-06-14T12:00:00.000Z",
+  };
+}
+
+function legacySummaryPayload() {
+  return {
+    insight: {
+      headline: "旧版摘要",
+      shortText: "这是旧版摘要，没有结构化元数据。",
+      keyMoments: ["主队领先", "客队追赶"],
+      tacticalNotes: ["主队边路推进", "客队加强压迫"],
+      playersToWatch: ["主队", "客队"],
+      probabilities: { homeWin: 1, draw: 0, awayWin: 0 },
+      confidence: "medium",
+      generatedFor: "summary",
+    },
+    model: "mimo-v2.5-pro",
+    promptVersion: "world-cup-2026-insight-v1",
+    sourceHash: "legacy-source-hash",
+    generatedAt: "2026-06-14T22:00:00.000Z",
   };
 }
 

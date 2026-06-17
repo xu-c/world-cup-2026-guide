@@ -44,12 +44,23 @@ export async function refreshWorldCupData(db, { now = new Date(), fetchImpl = fe
         continue;
       }
 
-      const row = await upsertMatch(db, sourceMatch);
+      const preserveFinishedScore = shouldPreserveFinishedScore(existingMatch);
+      const row = preserveFinishedScore
+        ? await updateMatchDisplayFields(db, sourceMatch.fifaId, sourceMatch)
+        : await upsertMatch(db, sourceMatch);
       upserted += 1;
 
       const match = {
         ...sourceMatch,
         id: row.id,
+        ...(preserveFinishedScore
+          ? {
+              homeScore: existingMatch.homeScore,
+              awayScore: existingMatch.awayScore,
+              status: existingMatch.status,
+              hasFinalScore: existingMatch.hasFinalScore,
+            }
+          : {}),
       };
 
       if (insightsGenerated >= maxInsights) {
@@ -62,7 +73,7 @@ export async function refreshWorldCupData(db, { now = new Date(), fetchImpl = fe
           ? await buildSummaryContext({
               db,
               row,
-              sourceMatch,
+              sourceMatch: match,
               fetchImpl,
             })
           : null;
@@ -130,9 +141,14 @@ function isLockedFinishedMatch(match, insight) {
     match &&
       isFinishedMatch(match) &&
       match.summaryHeadline &&
+      insight?.schemaVersion === "summary-v2" &&
       !(insight?.officialFactsStatus === "partial" && !insight?.finalizedAt) &&
       !(hasConfiguredAiProvider() && insight?.model === "local-fallback"),
   );
+}
+
+function shouldPreserveFinishedScore(match) {
+  return Boolean(match && isFinishedMatch(match) && match.summaryHeadline);
 }
 
 function shouldUpgradeFallbackInsight(insight) {
@@ -170,6 +186,7 @@ async function fetchMatchDetailResult(fifaId, fetchImpl) {
 
 function summaryNeedsRegeneration(existingSummary, factsHash, match, now) {
   if (!existingSummary) return true;
+  if (existingSummary.schemaVersion !== "summary-v2") return true;
   return Boolean(
     existingSummary.officialFactsStatus === "partial" &&
       existingSummary.officialFactsHash !== factsHash &&

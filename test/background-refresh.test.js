@@ -27,6 +27,7 @@ test("does not refresh fully cached finished matches again", () => {
           awayScore: 0,
           kickoffAt: "2026-06-11T20:00:00.000Z",
           summaryHeadline: "赛后总结",
+          summaryOfficialFactsStatus: "complete",
         },
       ],
       latestRefresh: {
@@ -37,6 +38,31 @@ test("does not refresh fully cached finished matches again", () => {
       now,
     }),
     { shouldRefresh: false, reason: "nothing_due" },
+  );
+});
+
+test("refreshes legacy finished summaries so they can upgrade to structured v2", () => {
+  assert.deepEqual(
+    shouldStartBackgroundRefresh({
+      matches: [
+        {
+          status: "finished",
+          hasFinalScore: true,
+          homeScore: 2,
+          awayScore: 0,
+          kickoffAt: "2026-06-11T20:00:00.000Z",
+          summaryHeadline: "旧版赛后总结",
+          summaryOfficialFactsStatus: null,
+        },
+      ],
+      latestRefresh: {
+        status: "success",
+        finished_at: "2026-06-12T00:00:00.000Z",
+        started_at: "2026-06-12T00:00:00.000Z",
+      },
+      now,
+    }),
+    { shouldRefresh: true, reason: "summary_legacy" },
   );
 });
 

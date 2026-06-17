@@ -21,6 +21,12 @@ export function shouldStartBackgroundRefresh({ matches, latestRefresh, now = new
       if (hasConfiguredAiProvider() && match.summaryModel === "local-fallback") {
         return { shouldRefresh: true, reason: "summary_local_fallback" };
       }
+      if (match.summaryModel === "local-fallback") {
+        continue;
+      }
+      if (!match.summaryOfficialFactsStatus) {
+        return { shouldRefresh: true, reason: "summary_legacy" };
+      }
       if (match.summaryOfficialFactsStatus === "partial") {
         const latestFinishedAt = refreshFinishedAt(latestRefresh);
         if (shouldRefreshPartialSummary({
