@@ -94,6 +94,60 @@ test("extractOfficialFacts supports Home and Away detail shapes", () => {
   assert.equal(facts.technicalFacts.officials[0], "VAR");
 });
 
+test("extractOfficialFacts resolves FIFA localized player names in events", () => {
+  const facts = extractOfficialFacts(
+    {
+      homeTeam: "墨西哥",
+      awayTeam: "南非",
+      homeScore: 2,
+      awayScore: 0,
+      raw: {},
+    },
+    {
+      HomeTeam: {
+        TeamName: [{ Locale: "en-GB", Description: "Mexico" }],
+        Players: [
+          {
+            IdPlayer: "429157",
+            ShortName: [{ Locale: "en-GB", Description: "Julian QUINONES" }],
+          },
+          {
+            IdPlayer: "464533",
+            PlayerName: [{ Locale: "en-GB", Description: "Brian GUTIERREZ" }],
+          },
+          {
+            IdPlayer: "448051",
+            PlayerName: [{ Locale: "en-GB", Description: "Luis CHAVEZ" }],
+          },
+        ],
+        Goals: [{ Type: 2, IdPlayer: "429157", Minute: "9'" }],
+        Bookings: [{ Card: 1, IdPlayer: "464533", Minute: "23'" }],
+        Substitutions: [
+          {
+            Minute: "66'",
+            IdPlayerOff: "464533",
+            IdPlayerOn: "448051",
+            PlayerOffName: [{ Locale: "en-GB", Description: "Brian GUTIERREZ" }],
+            PlayerOnName: [{ Locale: "en-GB", Description: "Luis CHAVEZ" }],
+          },
+        ],
+      },
+      AwayTeam: {
+        TeamName: [{ Locale: "en-GB", Description: "South Africa" }],
+        Players: [],
+        Goals: [],
+        Bookings: [],
+        Substitutions: [],
+      },
+    },
+  );
+
+  assert.equal(facts.officialEvents.goals[0].player, "Julian QUINONES");
+  assert.equal(facts.officialEvents.cards[0].player, "Brian GUTIERREZ");
+  assert.equal(facts.officialEvents.substitutions[0].playerOff, "Brian GUTIERREZ");
+  assert.equal(facts.officialEvents.substitutions[0].playerOn, "Luis CHAVEZ");
+});
+
 test("extractOfficialFacts prefers stored match score over detail score", () => {
   const facts = extractOfficialFacts(
     {

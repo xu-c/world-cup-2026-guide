@@ -45,8 +45,8 @@ export function extractOfficialFacts(match, detail = null) {
       ].map((event) => ({
         minute: minuteText(event.Minute ?? event.MatchMinute ?? event.Time),
         team: event.team,
-        player: playerLookup(playerNames, event.IdPlayer) || text(event.PlayerName) || text(event.ScorerName) || "未知球员",
-        assist: playerLookup(playerNames, event.IdAssistPlayer) || text(event.AssistName) || null,
+        player: playerLookup(playerNames, event.IdPlayer) || localized(event.PlayerName) || localized(event.ScorerName) || "未知球员",
+        assist: playerLookup(playerNames, event.IdAssistPlayer) || localized(event.AssistName) || null,
         type: goalType(event.Type ?? event.GoalType),
       })),
       cards: [
@@ -55,7 +55,7 @@ export function extractOfficialFacts(match, detail = null) {
       ].map((event) => ({
         minute: minuteText(event.Minute ?? event.MatchMinute ?? event.Time),
         team: event.team,
-        player: playerLookup(playerNames, event.IdPlayer) || text(event.PlayerName) || "未知球员",
+        player: playerLookup(playerNames, event.IdPlayer) || localized(event.PlayerName) || "未知球员",
         card: cardType(event.Card ?? event.CardType),
       })),
       substitutions: [
@@ -65,11 +65,11 @@ export function extractOfficialFacts(match, detail = null) {
         minute: minuteText(event.Minute ?? event.MatchMinute ?? event.Time),
         team: event.team,
         playerOff:
-          text(event.PlayerOffName) ||
+          localized(event.PlayerOffName) ||
           playerLookup(playerNames, event.IdPlayerOff ?? event.IdPlayer) ||
           "未知球员",
         playerOn:
-          text(event.PlayerOnName) ||
+          localized(event.PlayerOnName) ||
           playerLookup(playerNames, event.IdPlayerOn ?? event.IdSubstitutePlayer) ||
           "未知球员",
       })),
@@ -137,7 +137,7 @@ function playersForTeam(team) {
 }
 
 function playerName(player) {
-  return text(player.ShortName) || text(player.PlayerName) || text(localized(player.Name)) || "未知球员";
+  return localized(player.ShortName) || localized(player.PlayerName) || localized(player.Name) || "未知球员";
 }
 
 function playerLookup(playerNames, id) {
@@ -146,7 +146,7 @@ function playerLookup(playerNames, id) {
 }
 
 function teamName(team) {
-  return text(localized(team.TeamName)) || text(team.ShortClubName) || text(localized(team.Name)) || text(team.Name);
+  return localized(team.TeamName) || text(team.ShortClubName) || localized(team.Name) || text(team.Name);
 }
 
 function winnerText(homeScore, awayScore, homeName, awayName) {
@@ -180,17 +180,17 @@ function normalizedCode(value) {
 function officials(raw) {
   const items = Array.isArray(raw.Officials) ? raw.Officials : Array.isArray(raw.Referees) ? raw.Referees : [];
   return items
-    .map((official) => text(localized(official.Name)) || text(official.DisplayName) || text(official.Name))
+    .map((official) => localized(official.Name) || text(official.DisplayName) || text(official.Name))
     .filter(Boolean);
 }
 
 function localized(value) {
-  if (!Array.isArray(value)) return value;
+  if (!Array.isArray(value)) return text(value);
   const preferred =
     value.find((item) => String(item.Locale || "").toLowerCase().startsWith("zh")) ||
     value.find((item) => String(item.Locale || "").toLowerCase().startsWith("en")) ||
     value[0];
-  return preferred?.Description || preferred?.Name || preferred?.Value;
+  return text(preferred?.Description || preferred?.Name || preferred?.Value);
 }
 
 function minuteText(value) {

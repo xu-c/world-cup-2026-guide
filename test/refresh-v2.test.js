@@ -136,6 +136,175 @@ test("finished summary generation uses FIFA detail facts and existing prediction
   }
 });
 
+test("finished summary storage preserves official facts over AI event placeholders", async () => {
+  const context = createDb();
+  upsertMatch(context.db, scheduledMatch({ fifaId: "official-over-ai" }));
+
+  const previous = withEnv({
+    FIFA_MATCHES_URL: "https://fifa.example/matches",
+    FIFA_MATCH_DETAIL_BASE_URL: "https://fifa.example/detail",
+    AI_API_KEY: "test-key",
+    AI_BASE_URL: "https://provider.example/v1",
+    AI_MODEL: "mimo-v2.5-pro",
+  });
+
+  try {
+    await refreshWorldCupData(context.store, {
+      now: new Date("2026-06-14T23:00:00.000Z"),
+      fetchImpl: async (url) => {
+        const href = String(url);
+        if (href.includes("provider.example")) {
+          return aiResponse({
+            ...summaryV2({ officialFactsStatus: "partial" }),
+            officialEvents: {
+              goals: [{ minute: "9'", team: "主队", player: "主队球员", assist: null, type: "goal" }],
+              cards: [{ minute: "23'", team: "主队", player: "[object Object]", card: "yellow" }],
+              substitutions: [{ minute: "66'", team: "主队", playerOff: "未提供姓名", playerOn: "未提供姓名" }],
+            },
+            missingOfficialFields: ["goals"],
+          });
+        }
+        if (href.includes("/detail/official-over-ai")) {
+          return jsonResponse({
+            Home: {
+              TeamName: "主队",
+              Players: [
+                { IdPlayer: "p1", ShortName: [{ Locale: "en-GB", Description: "真实射手" }] },
+                { IdPlayer: "p2", PlayerName: [{ Locale: "en-GB", Description: "被换下球员" }] },
+                { IdPlayer: "p3", PlayerName: [{ Locale: "en-GB", Description: "替补登场球员" }] },
+              ],
+              Goals: [{ Minute: "9'", IdPlayer: "p1", Type: "goal" }],
+              Bookings: [{ Minute: "23'", IdPlayer: "p1", Card: 1 }],
+              Substitutions: [{ Minute: "66'", IdPlayerOff: "p2", IdPlayerOn: "p3" }],
+            },
+            Away: {
+              TeamName: "客队",
+              Players: [],
+              Goals: [],
+              Bookings: [],
+              Substitutions: [],
+            },
+            Stadium: { Name: "示例体育场" },
+          });
+        }
+        return jsonResponse({ Results: [finishedMatch({ fifaId: "official-over-ai" })] });
+      },
+    });
+
+    const match = getMatchByFifaId(context.db, "official-over-ai");
+    const summary = getInsight(context.db, match.id, "summary");
+    assert.equal(summary.officialFactsStatus, "complete");
+    assert.equal(summary.structured.officialFactsStatus, "complete");
+    assert.deepEqual(summary.structured.missingOfficialFields, []);
+    assert.equal(summary.structured.officialEvents.goals[0].player, "真实射手");
+    assert.equal(summary.structured.officialEvents.cards[0].player, "真实射手");
+    assert.equal(summary.structured.officialEvents.substitutions[0].playerOff, "被换下球员");
+    assert.equal(summary.structured.officialEvents.substitutions[0].playerOn, "替补登场球员");
+  } finally {
+    previous.restore();
+    context.close();
+  }
+});
+
+test("local fallback summaries remain partial even when official facts are complete", async () => {
+  const context = createDb();
+  upsertMatch(context.db, scheduledMatch({ fifaId: "fallback-summary" }));
+
+  const previous = withEnv({
+    FIFA_MATCHES_URL: "https://fifa.example/matches",
+    FIFA_MATCH_DETAIL_BASE_URL: "https://fifa.example/detail",
+    AI_API_KEY: "test-key",
+    AI_BASE_URL: "https://provider.example/v1",
+    AI_MODEL: "mimo-v2.5-pro",
+  });
+
+  try {
+    await refreshWorldCupData(context.store, {
+      now: new Date("2026-06-14T23:00:00.000Z"),
+      fetchImpl: async (url) => {
+        const href = String(url);
+        if (href.includes("provider.example")) {
+          return {
+            ok: true,
+            json: async () => {
+              throw new SyntaxError("bad provider body");
+            },
+          };
+        }
+        if (href.includes("/detail/fallback-summary")) {
+          return jsonResponse(completeDetail());
+        }
+        return jsonResponse({ Results: [finishedMatch({ fifaId: "fallback-summary" })] });
+      },
+    });
+
+    const match = getMatchByFifaId(context.db, "fallback-summary");
+    const summary = getInsight(context.db, match.id, "summary");
+    assert.equal(summary.model, "local-fallback");
+    assert.equal(summary.officialFactsStatus, "partial");
+    assert.equal(summary.structured.officialFactsStatus, "partial");
+    assert.equal(summary.finalizedAt, null);
+  } finally {
+    previous.restore();
+    context.close();
+  }
+});
+
+test("cached complete summaries with placeholder events regenerate instead of locking", async () => {
+  const context = createDb();
+  const existing = upsertMatch(context.db, normalizedFinishedMatch("placeholder-summary"));
+  upsertInsight(context.db, existing.id, "summary", {
+    ...summaryPayload({
+      generatedAt: "2026-06-14T22:00:00.000Z",
+      officialFactsStatus: "complete",
+      officialFactsHash: "bad-facts-hash",
+    }),
+    structured: {
+      ...summaryV2({ officialFactsStatus: "complete" }),
+      officialEvents: {
+        goals: [{ minute: "9'", team: "主队", player: "主队球员", assist: null, type: "goal" }],
+        cards: [],
+        substitutions: [],
+      },
+    },
+    schemaVersion: "summary-v2",
+    officialFactsStatus: "complete",
+    finalizedAt: "2026-06-14T22:00:00.000Z",
+  });
+
+  const previous = withEnv({
+    FIFA_MATCHES_URL: "https://fifa.example/matches",
+    FIFA_MATCH_DETAIL_BASE_URL: "https://fifa.example/detail",
+    AI_API_KEY: "test-key",
+    AI_BASE_URL: "https://provider.example/v1",
+    AI_MODEL: "mimo-v2.5-pro",
+  });
+
+  try {
+    await refreshWorldCupData(context.store, {
+      now: new Date("2026-06-15T23:00:00.000Z"),
+      fetchImpl: async (url) => {
+        const href = String(url);
+        if (href.includes("provider.example")) {
+          return aiResponse(summaryV2({ headline: "修复后的总结", officialFactsStatus: "complete" }));
+        }
+        if (href.includes("/detail/placeholder-summary")) {
+          return jsonResponse(completeDetail());
+        }
+        return jsonResponse({ Results: [finishedMatch({ fifaId: "placeholder-summary" })] });
+      },
+    });
+
+    const match = getMatchByFifaId(context.db, "placeholder-summary");
+    const summary = getInsight(context.db, match.id, "summary");
+    assert.equal(summary.headline, "修复后的总结");
+    assert.equal(summary.structured.officialEvents.goals[0].player, "球员A");
+  } finally {
+    previous.restore();
+    context.close();
+  }
+});
+
 test("legacy finished summaries upgrade to structured summary v2", async () => {
   const context = createDb();
   const existing = upsertMatch(context.db, normalizedFinishedMatch("legacy-summary"));

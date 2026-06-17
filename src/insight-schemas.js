@@ -11,6 +11,14 @@ export function validateStructuredInsight(value, expectedType = null) {
   throw new Error(`unknown schemaVersion: ${value.schemaVersion}`);
 }
 
+export function summaryNeedsRepair({ structured, officialFactsStatus = null } = {}) {
+  if (!structured || structured.schemaVersion !== "summary-v2") return false;
+  if (officialFactsStatus && structured.officialFactsStatus && structured.officialFactsStatus !== officialFactsStatus) {
+    return true;
+  }
+  return hasPlaceholderOfficialEventPlayers(structured.officialEvents);
+}
+
 export function validatePredictionV2(value, expectedType = "prediction") {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("prediction-v2 must be an object");
@@ -158,15 +166,34 @@ function validateOfficialEvents(value) {
   };
 }
 
+function hasPlaceholderOfficialEventPlayers(officialEvents) {
+  if (!officialEvents || typeof officialEvents !== "object") return false;
+  return (
+    (Array.isArray(officialEvents.goals) &&
+      officialEvents.goals.some((goal) => isPlaceholderOfficialName(goal?.player))) ||
+    (Array.isArray(officialEvents.cards) &&
+      officialEvents.cards.some((card) => isPlaceholderOfficialName(card?.player))) ||
+    (Array.isArray(officialEvents.substitutions) &&
+      officialEvents.substitutions.some(
+        (substitution) =>
+          isPlaceholderOfficialName(substitution?.playerOff) ||
+          isPlaceholderOfficialName(substitution?.playerOn),
+      ))
+  );
+}
+
 function validateGoal(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("goal must be an object");
   }
 
+  const player = requireText(value.player, "goal.player", 120);
+  rejectPlaceholderOfficialName(player, "goal.player");
+
   return {
     minute: requireText(value.minute, "goal.minute", 40),
     team: requireText(value.team, "goal.team", 120),
-    player: requireText(value.player, "goal.player", 120),
+    player,
     assist: value.assist === null || value.assist === undefined ? null : requireText(value.assist, "goal.assist", 120),
     type: requireText(value.type || "goal", "goal.type", 40),
   };
@@ -181,11 +208,13 @@ function validateCard(value) {
   if (!["yellow", "red", "second_yellow", "unknown"].includes(card)) {
     throw new Error(`unsupported card value: ${card}`);
   }
+  const player = requireText(value.player, "card.player", 120);
+  rejectPlaceholderOfficialName(player, "card.player");
 
   return {
     minute: requireText(value.minute, "card.minute", 40),
     team: requireText(value.team, "card.team", 120),
-    player: requireText(value.player, "card.player", 120),
+    player,
     card,
   };
 }
@@ -195,12 +224,37 @@ function validateSubstitution(value) {
     throw new Error("substitution must be an object");
   }
 
+  const playerOff = requireText(value.playerOff, "substitution.playerOff", 120);
+  const playerOn = requireText(value.playerOn, "substitution.playerOn", 120);
+  rejectPlaceholderOfficialName(playerOff, "substitution.playerOff");
+  rejectPlaceholderOfficialName(playerOn, "substitution.playerOn");
+
   return {
     minute: requireText(value.minute, "substitution.minute", 40),
     team: requireText(value.team, "substitution.team", 120),
-    playerOff: requireText(value.playerOff, "substitution.playerOff", 120),
-    playerOn: requireText(value.playerOn, "substitution.playerOn", 120),
+    playerOff,
+    playerOn,
   };
+}
+
+function rejectPlaceholderOfficialName(value, name) {
+  if (isPlaceholderOfficialName(value)) {
+    throw new Error(`placeholder official event player: ${name}`);
+  }
+}
+
+function isPlaceholderOfficialName(value) {
+  const text = String(value || "").trim();
+  return (
+    text === "[object Object]" ||
+    text === "未知球员" ||
+    text === "未提供" ||
+    text === "未提供姓名" ||
+    text === "未提供具体球员" ||
+    text === "官方数据未提供具体球员" ||
+    /^(主队|客队|.+队)球员$/u.test(text) ||
+    /^(墨西哥|南非|荷兰|日本|科特迪瓦|厄瓜多尔|比利时|埃及|瑞典|突尼斯|伊拉克|挪威|美国|巴拉圭|澳大利亚|土耳其|法国|塞内加尔)球员$/u.test(text)
+  );
 }
 
 function validateTechnicalFacts(value) {

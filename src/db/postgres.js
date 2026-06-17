@@ -1,5 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 
+import { summaryNeedsRepair } from "../insight-schemas.js";
+
 export async function openDatabase(env = process.env) {
   const sql = neon(env.DATABASE_URL);
   const store = { driver: "postgres", sql };
@@ -141,6 +143,7 @@ export async function listMatches({ sql }) {
       s.headline AS summary_headline,
       s.model AS summary_model,
       s.official_facts_status AS summary_official_facts_status,
+      s.structured_json AS summary_structured_json,
       p.headline AS prediction_headline
       , p.model AS prediction_model
     FROM matches m
@@ -171,6 +174,7 @@ export async function getMatchByFifaId({ sql }, fifaId) {
       s.headline AS summary_headline,
       s.model AS summary_model,
       s.official_facts_status AS summary_official_facts_status,
+      s.structured_json AS summary_structured_json,
       p.headline AS prediction_headline
       , p.model AS prediction_model
     FROM matches m
@@ -285,6 +289,10 @@ function rowToMatch(row) {
     summaryHeadline: row.summary_headline,
     summaryModel: row.summary_model,
     summaryOfficialFactsStatus: row.summary_official_facts_status,
+    summaryNeedsRepair: summaryNeedsRepair({
+      structured: parseOptionalJson(row.summary_structured_json),
+      officialFactsStatus: row.summary_official_facts_status,
+    }),
     predictionHeadline: row.prediction_headline,
     predictionModel: row.prediction_model,
   };

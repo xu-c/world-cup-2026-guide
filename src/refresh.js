@@ -12,6 +12,7 @@ import {
 } from "./db/index.js";
 import { generateInsight } from "./ai.js";
 import { hasConfiguredAiProvider } from "./ai.js";
+import { summaryNeedsRepair } from "./insight-schemas.js";
 import {
   insightTypeForMatch,
   isFinishedMatch,
@@ -107,16 +108,21 @@ export async function refreshWorldCupData(db, { now = new Date(), fetchImpl = fe
             ? {
                 ...match,
                 officialFacts: summaryContext.officialFacts,
+                summaryOfficialFactsStatus: finalCompletion ? "complete" : summaryContext.completeness.status,
+                missingOfficialFields: finalCompletion ? [] : summaryContext.completeness.missingOfficialFields,
                 existingPrediction: summaryContext.existingPrediction,
                 ...(finalCompletion ? { finalCompletion: true } : {}),
               }
             : match;
-        const payload = await generateInsight({
+        let payload = await generateInsight({
           type,
           match: generationMatch,
           fetchImpl,
           ...(finalCompletion ? { finalCompletion: true } : {}),
         });
+        if (type === "summary") {
+          payload = normalizeSummaryPayloadForStorage({ payload, summaryContext, finalCompletion });
+        }
         await upsertInsight(db, row.id, type, {
           ...payload,
           sourceHash: sourceMatch.sourceHash,
@@ -142,6 +148,7 @@ function isLockedFinishedMatch(match, insight) {
       isFinishedMatch(match) &&
       match.summaryHeadline &&
       insight?.schemaVersion === "summary-v2" &&
+      !summaryNeedsRepair({ structured: insight.structured, officialFactsStatus: insight.officialFactsStatus }) &&
       !(insight?.officialFactsStatus === "partial" && !insight?.finalizedAt) &&
       !(hasConfiguredAiProvider() && insight?.model === "local-fallback"),
   );
@@ -187,6 +194,9 @@ async function fetchMatchDetailResult(fifaId, fetchImpl) {
 function summaryNeedsRegeneration(existingSummary, factsHash, match, now) {
   if (!existingSummary) return true;
   if (existingSummary.schemaVersion !== "summary-v2") return true;
+  if (summaryNeedsRepair({ structured: existingSummary.structured, officialFactsStatus: existingSummary.officialFactsStatus })) {
+    return true;
+  }
   return Boolean(
     existingSummary.officialFactsStatus === "partial" &&
       existingSummary.officialFactsHash !== factsHash &&
@@ -201,12 +211,39 @@ function insightStorageMetadata({ type, match, payload, summaryContext, finalCom
     };
   }
 
-  const officialFactsStatus = finalCompletion ? "complete" : summaryContext.completeness.status;
+  const officialFactsStatus =
+    payload.model === "local-fallback"
+      ? "partial"
+      : finalCompletion
+        ? "complete"
+        : summaryContext.completeness.status;
   return {
     officialFactsStatus,
     officialFactsHash: summaryContext.factsHash,
     completionNotes: payload.structured?.completionNotes || null,
     finalizedAt: officialFactsStatus === "complete" ? now.toISOString() : null,
+  };
+}
+
+function normalizeSummaryPayloadForStorage({ payload, summaryContext, finalCompletion }) {
+  const officialFactsStatus =
+    payload.model === "local-fallback"
+      ? "partial"
+      : finalCompletion
+        ? "complete"
+        : summaryContext.completeness.status;
+  const missingOfficialFields =
+    officialFactsStatus === "complete" ? [] : summaryContext.completeness.missingOfficialFields;
+
+  if (!payload.structured) return payload;
+
+  return {
+    ...payload,
+    structured: {
+      ...payload.structured,
+      officialFactsStatus,
+      missingOfficialFields,
+    },
   };
 }
 

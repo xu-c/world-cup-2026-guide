@@ -118,10 +118,31 @@ export async function generateInsight({ type, match, fetchImpl = fetch }) {
 }
 
 function parseStructuredInsight(text, type, match) {
-  const parsed = parseInsightJson(text);
+  let parsed = parseInsightJson(text);
+  if (type === "summary" && parsed?.schemaVersion === "summary-v2") {
+    parsed = mergeOfficialSummaryFacts(parsed, match);
+  }
   if (parsed?.schemaVersion) return validateStructuredInsight(parsed, type);
 
   return legacyStructuredInsight(validateInsight(parsed, type), type, match);
+}
+
+function mergeOfficialSummaryFacts(parsed, match) {
+  if (!match?.officialFacts) return parsed;
+
+  const officialFactsStatus = match.summaryOfficialFactsStatus || parsed.officialFactsStatus;
+  const missingOfficialFields = Array.isArray(match.missingOfficialFields)
+    ? match.missingOfficialFields
+    : parsed.missingOfficialFields;
+
+  return {
+    ...parsed,
+    result: match.officialFacts.result || parsed.result,
+    officialEvents: match.officialFacts.officialEvents || parsed.officialEvents,
+    technicalFacts: match.officialFacts.technicalFacts || parsed.technicalFacts,
+    officialFactsStatus,
+    missingOfficialFields,
+  };
 }
 
 export function hasConfiguredAiProvider() {
@@ -183,6 +204,11 @@ function fallbackSummaryStructuredInsight(match) {
   const awayScore = nonNegativeScore(match.awayScore);
   const winner = homeScore > awayScore ? home : awayScore > homeScore ? away : "平局";
   const resultText = `${home} ${homeScore}-${awayScore} ${away}`;
+  const officialFacts = match.officialFacts || null;
+  const officialFactsStatus = match.summaryOfficialFactsStatus || "partial";
+  const missingOfficialFields = Array.isArray(match.missingOfficialFields)
+    ? match.missingOfficialFields
+    : ["goals", "cards", "substitutions"];
 
   return validateStructuredInsight(
     {
@@ -201,11 +227,11 @@ function fallbackSummaryStructuredInsight(match) {
         closingPhase: "赛后摘要会在首次刷新后缓存，并在官方事实补全后更新。",
       },
       officialEvents: {
-        goals: [],
-        cards: [],
-        substitutions: [],
+        goals: officialFacts?.officialEvents?.goals || [],
+        cards: officialFacts?.officialEvents?.cards || [],
+        substitutions: officialFacts?.officialEvents?.substitutions || [],
       },
-      technicalFacts: {
+      technicalFacts: officialFacts?.technicalFacts || {
         formations: { home: null, away: null },
         attendance: null,
         venue: match.venue || null,
@@ -217,8 +243,8 @@ function fallbackSummaryStructuredInsight(match) {
         resultExplanation: ["最终比分已确认", "本地占位摘要不补充未经提供的技术统计"],
       },
       predictionReview: null,
-      officialFactsStatus: "partial",
-      missingOfficialFields: ["goals", "cards", "substitutions"],
+      officialFactsStatus,
+      missingOfficialFields,
       completionNotes: {
         fallback: {
           source: "local-fallback",

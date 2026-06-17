@@ -41,6 +41,32 @@ test("does not refresh fully cached finished matches again", () => {
   );
 });
 
+test("refreshes cached summaries marked for structured repair after the 15 minute floor", () => {
+  assert.deepEqual(
+    shouldStartBackgroundRefresh({
+      matches: [
+        {
+          status: "finished",
+          hasFinalScore: true,
+          homeScore: 2,
+          awayScore: 0,
+          kickoffAt: "2026-06-11T20:00:00.000Z",
+          summaryHeadline: "赛后总结",
+          summaryOfficialFactsStatus: "complete",
+          summaryNeedsRepair: true,
+        },
+      ],
+      latestRefresh: {
+        status: "success",
+        finished_at: "2026-06-14T11:44:00.000Z",
+        started_at: "2026-06-14T11:43:00.000Z",
+      },
+      now,
+    }),
+    { shouldRefresh: true, reason: "summary_repair" },
+  );
+});
+
 test("refreshes legacy finished summaries so they can upgrade to structured v2", () => {
   assert.deepEqual(
     shouldStartBackgroundRefresh({

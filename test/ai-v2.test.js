@@ -248,6 +248,43 @@ test("summary-v2 rejects unsupported official facts status values", () => {
   );
 });
 
+test("summary-v2 rejects placeholder official event player names", () => {
+  assert.throws(
+    () =>
+      validateStructuredInsight(
+        {
+          schemaVersion: "summary-v2",
+          type: "summary",
+          headline: "占位符事件测试",
+          result: { homeScore: 2, awayScore: 0, winner: "主队", resultText: "主队 2-0 客队" },
+          matchStory: {
+            summary: "主队获胜。",
+            turningPoint: "首粒进球改变比赛。",
+            closingPhase: "主队守住优势。",
+          },
+          officialEvents: {
+            goals: [{ minute: "9'", team: "主队", player: "[object Object]", assist: null, type: "goal" }],
+            cards: [{ minute: "23'", team: "主队", player: "主队球员", card: "yellow" }],
+            substitutions: [{ minute: "66'", team: "主队", playerOff: "未提供姓名", playerOn: "替补" }],
+          },
+          technicalFacts: { formations: { home: null, away: null }, attendance: null, venue: null, officials: [] },
+          aiAnalysis: {
+            tacticalSummary: ["主队控制比赛。"],
+            keyPlayerImpact: [],
+            resultExplanation: ["主队机会质量更高。"],
+          },
+          predictionReview: null,
+          officialFactsStatus: "complete",
+          missingOfficialFields: [],
+          completionNotes: {},
+          generatedFor: "summary",
+        },
+        "summary",
+      ),
+    /placeholder official event player/,
+  );
+});
+
 test("validateStructuredInsight dispatches by schemaVersion", () => {
   assert.throws(() => validateStructuredInsight({ schemaVersion: "unknown" }), /unknown schemaVersion/);
 });

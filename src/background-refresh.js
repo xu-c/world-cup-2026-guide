@@ -24,6 +24,13 @@ export function shouldStartBackgroundRefresh({ matches, latestRefresh, now = new
       if (match.summaryModel === "local-fallback") {
         continue;
       }
+      if (match.summaryNeedsRepair) {
+        const latestFinishedAt = refreshFinishedAt(latestRefresh);
+        if (!latestFinishedAt || ageInMinutes(latestFinishedAt, now) >= 15) {
+          return { shouldRefresh: true, reason: "summary_repair" };
+        }
+        continue;
+      }
       if (!match.summaryOfficialFactsStatus) {
         const latestFinishedAt = refreshFinishedAt(latestRefresh);
         if (!latestFinishedAt || ageInMinutes(latestFinishedAt, now) >= 15) {
