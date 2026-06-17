@@ -17,11 +17,12 @@ test("finished matches do not render prediction badges", () => {
   );
 });
 
-test("unfinished match wording replaces unstarted wording", () => {
+test("status wording distinguishes same-day unfinished matches from future fixtures", () => {
   assert.match(appSource, /return "未完赛"/);
+  assert.match(appSource, /return "未开赛"/);
   assert.match(appSource, /return "进行中"/);
   assert.doesNotMatch(indexSource, /未开赛/);
-  assert.doesNotMatch(appSource, /未开赛/);
+  assert.match(appSource, /isFutureMatch\(match\.kickoffAt\)/);
 });
 
 test("date navigation is the only match list control", () => {

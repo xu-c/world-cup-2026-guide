@@ -120,7 +120,7 @@ function renderMatches() {
       <div class="teams">${escapeHtml(match.homeTeam)} vs ${escapeHtml(match.awayTeam)}</div>
       <div class="score">${scoreText(match)}</div>
       <div class="badge-row">
-        <span class="badge">${statusText(match.status)}</span>
+        <span class="badge">${statusText(match)}</span>
         ${match.summaryHeadline ? `<span class="badge">已有总结</span>` : ""}
         ${
           match.status !== "finished" && match.predictionHeadline
@@ -491,10 +491,19 @@ function scoreText(match) {
   return `${match.homeScore} - ${match.awayScore}`;
 }
 
-function statusText(status) {
+function statusText(match) {
+  const status = match.status;
   if (status === "finished") return "已完赛";
   if (status === "live") return "进行中";
+  if (isFutureMatch(match.kickoffAt)) return "未开赛";
   return "未完赛";
+}
+
+function isFutureMatch(kickoffAt) {
+  if (!kickoffAt) return false;
+  const kickoffDate = dateKey(new Date(kickoffAt));
+  const today = dateKey(new Date());
+  return kickoffDate > today;
 }
 
 function formatDateTime(value) {
