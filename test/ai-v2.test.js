@@ -298,6 +298,9 @@ test("summaryNeedsRepair flags non-Chinese official event player names", () => {
           cards: [{ player: "布赖恩·古铁雷斯" }],
           substitutions: [{ playerOff: "路易斯·查韦斯", playerOn: "Alexis VEGA" }],
         },
+        technicalFacts: {
+          officials: ["Wilton SAMPAIO"],
+        },
       },
     }),
     true,
@@ -393,7 +396,7 @@ test("generateInsight applies AI player name translations to official events onl
             formations: { home: null, away: null },
             attendance: null,
             venue: "示例体育场",
-            officials: [],
+            officials: ["Wilton SAMPAIO"],
           },
         },
       },
@@ -424,7 +427,7 @@ test("generateInsight applies AI player name translations to official events onl
                     formations: { home: null, away: null },
                     attendance: null,
                     venue: "示例体育场",
-                    officials: [],
+                    officials: ["裁判占位"],
                   },
                   aiAnalysis: {
                     tacticalSummary: ["墨西哥推进更直接。"],
@@ -436,6 +439,7 @@ test("generateInsight applies AI player name translations to official events onl
                     "Julian QUINONES": "胡利安·基尼奥内斯",
                     "Brian GUTIERREZ": "布赖恩·古铁雷斯",
                     "Luis CHAVEZ": "路易斯·查韦斯",
+                    "Wilton SAMPAIO": "威尔顿·桑帕约",
                   },
                   officialFactsStatus: "partial",
                   missingOfficialFields: ["goals"],
@@ -453,6 +457,7 @@ test("generateInsight applies AI player name translations to official events onl
     assert.equal(result.structured.officialEvents.cards[0].player, "布赖恩·古铁雷斯");
     assert.equal(result.structured.officialEvents.substitutions[0].playerOff, "布赖恩·古铁雷斯");
     assert.equal(result.structured.officialEvents.substitutions[0].playerOn, "路易斯·查韦斯");
+    assert.equal(result.structured.technicalFacts.officials[0], "威尔顿·桑帕约");
     assert.equal(result.structured.officialEvents.goals[0].minute, "9'");
     assert.equal(result.structured.officialFactsStatus, "complete");
   } finally {

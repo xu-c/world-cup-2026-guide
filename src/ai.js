@@ -18,8 +18,8 @@ export function buildInsightPrompt({ type, match }) {
     "Do not claim certainty; predictions must be probabilistic.",
     "For predictions, include predictedScore, outcomeProbabilities, matchScript, scoreRationale, tacticalFactors, decisiveFactors, and riskFactors.",
     "For summaries, use officialEvents and technicalFacts from supplied facts only.",
-    "For summaries, return playerNameTranslations mapping every supplied non-Chinese official event player name to a concise Chinese display name. Use the original name as the key.",
-    "Do not translate event minutes, event types, scores, or team names inside officialEvents; only provide playerNameTranslations.",
+    "For summaries, return playerNameTranslations mapping every supplied non-Chinese official event player name and match official name to a concise Chinese display name. Use the original name as the key.",
+    "Do not translate event minutes, event types, scores, or team names inside officialEvents; only provide name translations in playerNameTranslations.",
     "Do not add shots, shots on target, possession, xG, injuries, quotes, or unavailable player status.",
     "If player data is not supplied, use team-level wording instead of inventing player names.",
     "Do not fabricate predictionReview; set predictionReview to null unless existingPrediction is supplied in Match facts.",
@@ -140,12 +140,16 @@ function mergeOfficialSummaryFacts(parsed, match) {
     match.officialFacts.officialEvents || parsed.officialEvents,
     parsed.playerNameTranslations,
   );
+  const technicalFacts = applyOfficialNameTranslations(
+    match.officialFacts.technicalFacts || parsed.technicalFacts,
+    parsed.playerNameTranslations,
+  );
 
   return {
     ...parsed,
     result: match.officialFacts.result || parsed.result,
     officialEvents,
-    technicalFacts: match.officialFacts.technicalFacts || parsed.technicalFacts,
+    technicalFacts,
     officialFactsStatus,
     missingOfficialFields,
   };
@@ -178,6 +182,24 @@ function applyPlayerNameTranslations(officialEvents, translations) {
           playerOff: translate(substitution.playerOff),
           playerOn: translate(substitution.playerOn),
         }))
+      : [],
+  };
+}
+
+function applyOfficialNameTranslations(technicalFacts, translations) {
+  if (!technicalFacts || !translations || typeof translations !== "object" || Array.isArray(translations)) {
+    return technicalFacts;
+  }
+
+  const translate = (name) => {
+    const translated = translations[name];
+    return typeof translated === "string" && translated.trim() ? translated.trim() : name;
+  };
+
+  return {
+    ...technicalFacts,
+    officials: Array.isArray(technicalFacts.officials)
+      ? technicalFacts.officials.map(translate)
       : [],
   };
 }
@@ -504,7 +526,7 @@ function summarySchema() {
       fieldName: { source: "official | ai | local-fallback", label: "string" },
     },
     playerNameTranslations: {
-      "original non-Chinese event player name": "Chinese display name",
+      "original non-Chinese event player or match official name": "Chinese display name",
     },
     generatedFor: "summary",
   };

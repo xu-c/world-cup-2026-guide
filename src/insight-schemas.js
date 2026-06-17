@@ -16,7 +16,11 @@ export function summaryNeedsRepair({ structured, officialFactsStatus = null } = 
   if (officialFactsStatus && structured.officialFactsStatus && structured.officialFactsStatus !== officialFactsStatus) {
     return true;
   }
-  return hasPlaceholderOfficialEventPlayers(structured.officialEvents) || hasNonChineseOfficialEventPlayers(structured.officialEvents);
+  return (
+    hasPlaceholderOfficialEventPlayers(structured.officialEvents) ||
+    hasNonChineseOfficialEventPlayers(structured.officialEvents) ||
+    hasNonChineseOfficials(structured.technicalFacts)
+  );
 }
 
 export function validatePredictionV2(value, expectedType = "prediction") {
@@ -202,6 +206,13 @@ function isNonChineseDisplayName(value) {
   const text = String(value || "").trim();
   if (!text) return false;
   return /[A-Za-z]/.test(text) && !/[\p{Script=Han}]/u.test(text);
+}
+
+function hasNonChineseOfficials(technicalFacts) {
+  return (
+    Array.isArray(technicalFacts?.officials) &&
+    technicalFacts.officials.some((official) => isNonChineseDisplayName(official))
+  );
 }
 
 function validateGoal(value) {
