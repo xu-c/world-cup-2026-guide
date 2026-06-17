@@ -18,6 +18,8 @@ export function buildInsightPrompt({ type, match }) {
     "Do not claim certainty; predictions must be probabilistic.",
     "For predictions, include predictedScore, outcomeProbabilities, matchScript, scoreRationale, tacticalFactors, decisiveFactors, and riskFactors.",
     "For summaries, use officialEvents and technicalFacts from supplied facts only.",
+    "For summaries, return playerNameTranslations mapping every supplied non-Chinese official event player name to a concise Chinese display name. Use the original name as the key.",
+    "Do not translate event minutes, event types, scores, or team names inside officialEvents; only provide playerNameTranslations.",
     "Do not add shots, shots on target, possession, xG, injuries, quotes, or unavailable player status.",
     "If player data is not supplied, use team-level wording instead of inventing player names.",
     "Do not fabricate predictionReview; set predictionReview to null unless existingPrediction is supplied in Match facts.",
@@ -134,14 +136,49 @@ function mergeOfficialSummaryFacts(parsed, match) {
   const missingOfficialFields = Array.isArray(match.missingOfficialFields)
     ? match.missingOfficialFields
     : parsed.missingOfficialFields;
+  const officialEvents = applyPlayerNameTranslations(
+    match.officialFacts.officialEvents || parsed.officialEvents,
+    parsed.playerNameTranslations,
+  );
 
   return {
     ...parsed,
     result: match.officialFacts.result || parsed.result,
-    officialEvents: match.officialFacts.officialEvents || parsed.officialEvents,
+    officialEvents,
     technicalFacts: match.officialFacts.technicalFacts || parsed.technicalFacts,
     officialFactsStatus,
     missingOfficialFields,
+  };
+}
+
+function applyPlayerNameTranslations(officialEvents, translations) {
+  if (!officialEvents || !translations || typeof translations !== "object" || Array.isArray(translations)) {
+    return officialEvents;
+  }
+
+  const translate = (name) => {
+    const translated = translations[name];
+    return typeof translated === "string" && translated.trim() ? translated.trim() : name;
+  };
+
+  return {
+    goals: Array.isArray(officialEvents.goals)
+      ? officialEvents.goals.map((goal) => ({
+          ...goal,
+          player: translate(goal.player),
+          assist: goal.assist ? translate(goal.assist) : goal.assist,
+        }))
+      : [],
+    cards: Array.isArray(officialEvents.cards)
+      ? officialEvents.cards.map((card) => ({ ...card, player: translate(card.player) }))
+      : [],
+    substitutions: Array.isArray(officialEvents.substitutions)
+      ? officialEvents.substitutions.map((substitution) => ({
+          ...substitution,
+          playerOff: translate(substitution.playerOff),
+          playerOn: translate(substitution.playerOn),
+        }))
+      : [],
   };
 }
 
@@ -465,6 +502,9 @@ function summarySchema() {
     missingOfficialFields: ["string"],
     completionNotes: {
       fieldName: { source: "official | ai | local-fallback", label: "string" },
+    },
+    playerNameTranslations: {
+      "original non-Chinese event player name": "Chinese display name",
     },
     generatedFor: "summary",
   };

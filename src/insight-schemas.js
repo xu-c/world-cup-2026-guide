@@ -16,7 +16,7 @@ export function summaryNeedsRepair({ structured, officialFactsStatus = null } = 
   if (officialFactsStatus && structured.officialFactsStatus && structured.officialFactsStatus !== officialFactsStatus) {
     return true;
   }
-  return hasPlaceholderOfficialEventPlayers(structured.officialEvents);
+  return hasPlaceholderOfficialEventPlayers(structured.officialEvents) || hasNonChineseOfficialEventPlayers(structured.officialEvents);
 }
 
 export function validatePredictionV2(value, expectedType = "prediction") {
@@ -180,6 +180,28 @@ function hasPlaceholderOfficialEventPlayers(officialEvents) {
           isPlaceholderOfficialName(substitution?.playerOn),
       ))
   );
+}
+
+function hasNonChineseOfficialEventPlayers(officialEvents) {
+  if (!officialEvents || typeof officialEvents !== "object") return false;
+  return (
+    (Array.isArray(officialEvents.goals) &&
+      officialEvents.goals.some((goal) => isNonChineseDisplayName(goal?.player) || isNonChineseDisplayName(goal?.assist))) ||
+    (Array.isArray(officialEvents.cards) &&
+      officialEvents.cards.some((card) => isNonChineseDisplayName(card?.player))) ||
+    (Array.isArray(officialEvents.substitutions) &&
+      officialEvents.substitutions.some(
+        (substitution) =>
+          isNonChineseDisplayName(substitution?.playerOff) ||
+          isNonChineseDisplayName(substitution?.playerOn),
+      ))
+  );
+}
+
+function isNonChineseDisplayName(value) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  return /[A-Za-z]/.test(text) && !/[\p{Script=Han}]/u.test(text);
 }
 
 function validateGoal(value) {

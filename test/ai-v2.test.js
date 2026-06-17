@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  summaryNeedsRepair,
   validatePredictionV2,
   validateSummaryV2,
   validateStructuredInsight,
@@ -285,6 +286,24 @@ test("summary-v2 rejects placeholder official event player names", () => {
   );
 });
 
+test("summaryNeedsRepair flags non-Chinese official event player names", () => {
+  assert.equal(
+    summaryNeedsRepair({
+      officialFactsStatus: "complete",
+      structured: {
+        schemaVersion: "summary-v2",
+        officialFactsStatus: "complete",
+        officialEvents: {
+          goals: [{ player: "Julian QUINONES" }],
+          cards: [{ player: "布赖恩·古铁雷斯" }],
+          substitutions: [{ playerOff: "路易斯·查韦斯", playerOn: "Alexis VEGA" }],
+        },
+      },
+    }),
+    true,
+  );
+});
+
 test("validateStructuredInsight dispatches by schemaVersion", () => {
   assert.throws(() => validateStructuredInsight({ schemaVersion: "unknown" }), /unknown schemaVersion/);
 });
@@ -332,6 +351,115 @@ test("summary prompt requests v2 summary fields and forbids unsupported stats", 
   assert.match(prompt, /injuries/);
   assert.match(prompt, /quotes/);
   assert.match(prompt, /unavailable player status/);
+  assert.match(prompt, /playerNameTranslations/);
+});
+
+test("generateInsight applies AI player name translations to official events only", async () => {
+  const previous = {
+    AI_BASE_URL: process.env.AI_BASE_URL,
+    AI_API_KEY: process.env.AI_API_KEY,
+    AI_MODEL: process.env.AI_MODEL,
+  };
+  process.env.AI_BASE_URL = "https://provider.example/v1";
+  process.env.AI_API_KEY = "test-key";
+  process.env.AI_MODEL = "mimo-v2.5-pro";
+
+  try {
+    const result = await generateInsight({
+      type: "summary",
+      match: {
+        homeTeam: "墨西哥",
+        awayTeam: "南非",
+        homeScore: 2,
+        awayScore: 0,
+        status: "finished",
+        summaryOfficialFactsStatus: "complete",
+        missingOfficialFields: [],
+        officialFacts: {
+          result: { homeScore: 2, awayScore: 0, winner: "墨西哥", resultText: "墨西哥 2-0 南非" },
+          officialEvents: {
+            goals: [{ minute: "9'", team: "Mexico", player: "Julian QUINONES", assist: null, type: "goal" }],
+            cards: [{ minute: "23'", team: "Mexico", player: "Brian GUTIERREZ", card: "yellow" }],
+            substitutions: [
+              {
+                minute: "66'",
+                team: "Mexico",
+                playerOff: "Brian GUTIERREZ",
+                playerOn: "Luis CHAVEZ",
+              },
+            ],
+          },
+          technicalFacts: {
+            formations: { home: null, away: null },
+            attendance: null,
+            venue: "示例体育场",
+            officials: [],
+          },
+        },
+      },
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  schemaVersion: "summary-v2",
+                  type: "summary",
+                  headline: "墨西哥取胜",
+                  result: { homeScore: 2, awayScore: 0, winner: "墨西哥", resultText: "墨西哥 2-0 南非" },
+                  matchStory: {
+                    summary: "墨西哥掌握比赛。",
+                    turningPoint: "早段进球改变节奏。",
+                    closingPhase: "墨西哥守住优势。",
+                  },
+                  officialEvents: {
+                    goals: [{ minute: "9'", team: "Mexico", player: "墨西哥球员", assist: null, type: "goal" }],
+                    cards: [{ minute: "23'", team: "Mexico", player: "墨西哥球员", card: "yellow" }],
+                    substitutions: [
+                      { minute: "66'", team: "Mexico", playerOff: "墨西哥球员", playerOn: "墨西哥球员" },
+                    ],
+                  },
+                  technicalFacts: {
+                    formations: { home: null, away: null },
+                    attendance: null,
+                    venue: "示例体育场",
+                    officials: [],
+                  },
+                  aiAnalysis: {
+                    tacticalSummary: ["墨西哥推进更直接。"],
+                    keyPlayerImpact: ["中文名映射只用于显示。"],
+                    resultExplanation: ["墨西哥机会质量更高。"],
+                  },
+                  predictionReview: null,
+                  playerNameTranslations: {
+                    "Julian QUINONES": "胡利安·基尼奥内斯",
+                    "Brian GUTIERREZ": "布赖恩·古铁雷斯",
+                    "Luis CHAVEZ": "路易斯·查韦斯",
+                  },
+                  officialFactsStatus: "partial",
+                  missingOfficialFields: ["goals"],
+                  completionNotes: {},
+                  generatedFor: "summary",
+                }),
+              },
+            },
+          ],
+        }),
+      }),
+    });
+
+    assert.equal(result.structured.officialEvents.goals[0].player, "胡利安·基尼奥内斯");
+    assert.equal(result.structured.officialEvents.cards[0].player, "布赖恩·古铁雷斯");
+    assert.equal(result.structured.officialEvents.substitutions[0].playerOff, "布赖恩·古铁雷斯");
+    assert.equal(result.structured.officialEvents.substitutions[0].playerOn, "路易斯·查韦斯");
+    assert.equal(result.structured.officialEvents.goals[0].minute, "9'");
+    assert.equal(result.structured.officialFactsStatus, "complete");
+  } finally {
+    restoreEnv("AI_BASE_URL", previous.AI_BASE_URL);
+    restoreEnv("AI_API_KEY", previous.AI_API_KEY);
+    restoreEnv("AI_MODEL", previous.AI_MODEL);
+  }
 });
 
 test("generateInsight returns structured prediction-v2 payload", async () => {
