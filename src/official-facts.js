@@ -11,8 +11,8 @@ export function extractOfficialFacts(match, detail = null) {
   const raw = detail || match.raw || {};
   const home = raw.HomeTeam || raw.Home || {};
   const away = raw.AwayTeam || raw.Away || {};
-  const homeName = teamName(home) || match.homeTeam || "主队";
-  const awayName = teamName(away) || match.awayTeam || "客队";
+  const homeName = text(match.homeTeam) || teamName(home) || "主队";
+  const awayName = text(match.awayTeam) || teamName(away) || "客队";
   const homeScore = numberOrNull(
     match.homeScore ?? raw.HomeScore ?? raw.HomeTeamScore ?? home.Score,
   );

@@ -143,9 +143,12 @@ test("extractOfficialFacts resolves FIFA localized player names in events", () =
   );
 
   assert.equal(facts.officialEvents.goals[0].player, "Julian QUINONES");
+  assert.equal(facts.officialEvents.goals[0].team, "墨西哥");
   assert.equal(facts.officialEvents.cards[0].player, "Brian GUTIERREZ");
+  assert.equal(facts.officialEvents.cards[0].team, "墨西哥");
   assert.equal(facts.officialEvents.substitutions[0].playerOff, "Brian GUTIERREZ");
   assert.equal(facts.officialEvents.substitutions[0].playerOn, "Luis CHAVEZ");
+  assert.equal(facts.officialEvents.substitutions[0].team, "墨西哥");
 });
 
 test("extractOfficialFacts keeps official events with missing minutes", () => {
