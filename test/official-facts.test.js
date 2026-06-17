@@ -148,6 +148,40 @@ test("extractOfficialFacts resolves FIFA localized player names in events", () =
   assert.equal(facts.officialEvents.substitutions[0].playerOn, "Luis CHAVEZ");
 });
 
+test("extractOfficialFacts keeps official events with missing minutes", () => {
+  const facts = extractOfficialFacts(
+    {
+      homeTeam: "美国",
+      awayTeam: "巴拉圭",
+      homeScore: 4,
+      awayScore: 1,
+      raw: {},
+    },
+    {
+      HomeTeam: {
+        TeamName: "USA",
+        Players: [
+          { IdPlayer: "p1", ShortName: "Christian PULISIC" },
+          { IdPlayer: "p2", ShortName: "Sebastian BERHALTER" },
+        ],
+        Goals: [],
+        Bookings: [],
+        Substitutions: [{ IdPlayerOff: "p1", IdPlayerOn: "p2" }],
+      },
+      AwayTeam: {
+        TeamName: "Paraguay",
+        Players: [],
+        Goals: [],
+        Bookings: [],
+        Substitutions: [],
+      },
+    },
+  );
+
+  assert.equal(facts.officialEvents.substitutions[0].minute, "时间暂缺");
+  assert.equal(facts.officialEvents.substitutions[0].playerOff, "Christian PULISIC");
+});
+
 test("extractOfficialFacts prefers stored match score over detail score", () => {
   const facts = extractOfficialFacts(
     {

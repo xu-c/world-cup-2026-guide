@@ -195,7 +195,7 @@ function localized(value) {
 
 function minuteText(value) {
   const minute = text(value);
-  return minute || "";
+  return minute || "时间暂缺";
 }
 
 function text(value) {
