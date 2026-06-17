@@ -328,6 +328,19 @@ main {
   margin: 0;
 }
 
+.person-name {
+  background: rgba(13, 112, 76, 0.09);
+  border-radius: 5px;
+  color: #074b34;
+  font-family:
+    "Noto Serif SC",
+    "Songti SC",
+    "SimSun",
+    serif;
+  font-weight: 700;
+  padding: 0.02rem 0.18rem;
+}
+
 .subtle-panel {
   background: rgba(248, 250, 252, 0.72);
 }

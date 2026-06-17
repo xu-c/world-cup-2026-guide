@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const appSource = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
 const indexSource = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+const styleSource = readFileSync(new URL("../public/styles.css", import.meta.url), "utf8");
 
 test("date wheel scrolling is batched into animation frames", () => {
   assert.match(appSource, /requestAnimationFrame/);
@@ -105,4 +106,22 @@ test("frontend escapes official attendance values", () => {
 
 test("frontend guards technical fact officials before summary v2 rendering", () => {
   assert.match(appSource, /Array\.isArray\(summary\.technicalFacts\.officials\)/);
+});
+
+test("frontend localizes card types in official events", () => {
+  assert.match(appSource, /function formatCardType/);
+  assert.match(appSource, /yellow: "黄牌"/);
+  assert.match(appSource, /red: "红牌"/);
+  assert.match(appSource, /second_yellow: "两黄变红"/);
+});
+
+test("frontend visually emphasizes person names in structured insights", () => {
+  assert.match(appSource, /function personName/);
+  assert.match(appSource, /class="person-name"/);
+  assert.match(styleSource, /\.person-name/);
+  assert.match(styleSource, /font-family:[\s\S]*serif/);
+  assert.match(appSource, /personName\(goal\.player\)/);
+  assert.match(appSource, /personName\(card\.player\)/);
+  assert.match(appSource, /personName\(\s*substitution\.playerOn/s);
+  assert.match(appSource, /personName\(official\)/);
 });

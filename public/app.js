@@ -9,6 +9,12 @@ let softRefreshInFlight = false;
 
 const ACTIVE_REFRESH_INTERVAL_MS = 60_000;
 const IDLE_REFRESH_INTERVAL_MS = 5 * 60_000;
+const CARD_TYPE_LABELS = {
+  yellow: "黄牌",
+  red: "红牌",
+  second_yellow: "两黄变红",
+  unknown: "牌型暂缺",
+};
 
 const matchesEl = document.querySelector("#matches");
 const detailEl = document.querySelector("#detail");
@@ -314,23 +320,23 @@ function renderStructuredSummary(summary) {
         ${renderEventList(
           summary.officialEvents.goals,
           (goal) =>
-            `${escapeHtml(goal.minute)} ${escapeHtml(goal.team)} ${escapeHtml(goal.player)}${
-              goal.assist ? ` · 助攻 ${escapeHtml(goal.assist)}` : ""
+            `${escapeHtml(goal.minute)} ${escapeHtml(goal.team)} ${personName(goal.player)}${
+              goal.assist ? ` · 助攻 ${personName(goal.assist)}` : ""
             }`,
         )}
         <h4>红黄牌</h4>
         ${renderEventList(
           summary.officialEvents.cards,
           (card) =>
-            `${escapeHtml(card.minute)} ${escapeHtml(card.team)} ${escapeHtml(card.player)} ${escapeHtml(card.card)}`,
+            `${escapeHtml(card.minute)} ${escapeHtml(card.team)} ${personName(card.player)} ${escapeHtml(formatCardType(card.card))}`,
         )}
         <h4>换人</h4>
         ${renderEventList(
           summary.officialEvents.substitutions,
           (substitution) =>
-            `${escapeHtml(substitution.minute)} ${escapeHtml(substitution.team)} ${escapeHtml(
+            `${escapeHtml(substitution.minute)} ${escapeHtml(substitution.team)} ${personName(
               substitution.playerOn,
-            )} 换下 ${escapeHtml(substitution.playerOff)}`,
+            )} 换下 ${personName(substitution.playerOff)}`,
         )}
       </section>
       <section class="panel">
@@ -363,6 +369,7 @@ function renderAnalysisList(label, items) {
 
 function renderTechnicalFacts(summary) {
   const facts = summary.technicalFacts;
+  const officials = Array.isArray(facts.officials) ? facts.officials : [];
   return `
     <dl class="facts-list">
       <dt>阵型</dt>
@@ -372,9 +379,17 @@ function renderTechnicalFacts(summary) {
       <dt>上座人数</dt>
       <dd>${escapeHtml(String(facts.attendance ?? "暂缺"))} ${renderCompletionNote(summary, "attendance")}</dd>
       <dt>裁判</dt>
-      <dd>${escapeHtml((facts.officials || []).join("、") || "暂缺")} ${renderCompletionNote(summary, "officials")}</dd>
+      <dd>${officials.length ? officials.map((official) => personName(official)).join("、") : "暂缺"} ${renderCompletionNote(summary, "officials")}</dd>
     </dl>
   `;
+}
+
+function formatCardType(cardType) {
+  return CARD_TYPE_LABELS[cardType] || CARD_TYPE_LABELS.unknown;
+}
+
+function personName(value) {
+  return `<span class="person-name">${escapeHtml(value)}</span>`;
 }
 
 function renderCompletionNote(summary, key) {
