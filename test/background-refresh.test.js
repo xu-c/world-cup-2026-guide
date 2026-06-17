@@ -66,6 +66,31 @@ test("refreshes legacy finished summaries so they can upgrade to structured v2",
   );
 });
 
+test("does not immediately re-run legacy summary upgrades before the 15 minute floor", () => {
+  assert.deepEqual(
+    shouldStartBackgroundRefresh({
+      matches: [
+        {
+          status: "finished",
+          hasFinalScore: true,
+          homeScore: 2,
+          awayScore: 0,
+          kickoffAt: "2026-06-11T20:00:00.000Z",
+          summaryHeadline: "旧版赛后总结",
+          summaryOfficialFactsStatus: null,
+        },
+      ],
+      latestRefresh: {
+        status: "success",
+        finished_at: "2026-06-14T11:50:00.000Z",
+        started_at: "2026-06-14T11:49:00.000Z",
+      },
+      now,
+    }),
+    { shouldRefresh: false, reason: "nothing_due" },
+  );
+});
+
 test("refreshes a finished match once when its summary is missing", () => {
   assert.deepEqual(
     shouldStartBackgroundRefresh({

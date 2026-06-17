@@ -25,7 +25,11 @@ export function shouldStartBackgroundRefresh({ matches, latestRefresh, now = new
         continue;
       }
       if (!match.summaryOfficialFactsStatus) {
-        return { shouldRefresh: true, reason: "summary_legacy" };
+        const latestFinishedAt = refreshFinishedAt(latestRefresh);
+        if (!latestFinishedAt || ageInMinutes(latestFinishedAt, now) >= 15) {
+          return { shouldRefresh: true, reason: "summary_legacy" };
+        }
+        continue;
       }
       if (match.summaryOfficialFactsStatus === "partial") {
         const latestFinishedAt = refreshFinishedAt(latestRefresh);
